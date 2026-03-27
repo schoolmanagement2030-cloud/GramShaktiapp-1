@@ -6,7 +6,7 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    // यहाँ हमने आपके GitHub Repository का नाम 'base' में जोड़ दिया है
+    // आपकी रिपोजिटरी का नाम यहाँ होना जरूरी है
     base: '/GramShaktiapp-1/', 
     plugins: [react(), tailwindcss()],
     define: {
@@ -17,9 +17,10 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      outDir: 'dist',
+    },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };
