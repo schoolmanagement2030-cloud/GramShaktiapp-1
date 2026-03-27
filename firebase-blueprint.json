@@ -1,0 +1,132 @@
+{
+  "entities": {
+    "Worker": {
+      "title": "Worker",
+      "description": "A local worker, shop, or service provider.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the worker."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the worker or shop."
+        },
+        "mobile": {
+          "type": "string",
+          "description": "Contact mobile number."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the service (Bilingual: Hindi + English)."
+        },
+        "skills": {
+          "type": "string",
+          "description": "Specific skills or services provided (e.g., Plumber, Kirana Store)."
+        },
+        "pincode": {
+          "type": "string",
+          "description": "Postal pincode."
+        },
+        "village": {
+          "type": "string",
+          "description": "Village or locality name."
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          },
+          "description": "GPS coordinates."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of registration."
+        }
+      },
+      "required": ["uid", "name", "mobile", "category", "skills", "location"]
+    },
+    "PendingAd": {
+      "title": "Pending Ad",
+      "description": "An ad request waiting for admin approval.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "text": { "type": "string" },
+        "image": { "type": "string", "description": "Base64 image data." },
+        "adType": { "type": "string", "enum": ["Local", "Corporate"] },
+        "websiteUrl": { "type": "string" },
+        "targetLevel": { "type": "string", "enum": ["India", "State", "District", "Tehsil"] },
+        "targetValue": { "type": "string" },
+        "plan": { "type": "number", "enum": [7, 15, 30] },
+        "price": { "type": "number" },
+        "paymentScreenshot": { "type": "string", "description": "Base64 image data." },
+        "status": { "type": "string", "enum": ["pending", "active", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "text", "image", "adType", "targetLevel", "targetValue", "plan", "price", "paymentScreenshot", "status", "createdAt"]
+    },
+    "ActiveBanner": {
+      "title": "Active Banner",
+      "description": "An approved ad currently being displayed.",
+      "type": "object",
+      "properties": {
+        "expiryDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["expiryDate"]
+    },
+    "AdStats": {
+      "title": "Ad Stats",
+      "description": "Statistics for corporate ads.",
+      "type": "object",
+      "properties": {
+        "adId": { "type": "string" },
+        "views": { "type": "number" },
+        "clicks": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["adId", "views", "clicks", "lastUpdated"]
+    },
+    "AdRequest": {
+      "title": "Ad Request",
+      "description": "A message from a user about an ad.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "mobile": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "mobile", "message", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/workers/{workerId}": {
+      "schema": "Worker",
+      "description": "Collection of registered workers and service providers."
+    },
+    "/pending_ads/{adId}": {
+      "schema": "PendingAd",
+      "description": "Ads waiting for approval."
+    },
+    "/active_banners/{adId}": {
+      "schema": "ActiveBanner",
+      "description": "Approved and active ads."
+    },
+    "/ad_requests/{requestId}": {
+      "schema": "AdRequest",
+      "description": "Messages from users about ads."
+    },
+    "/ad_stats/{adId}": {
+      "schema": "AdStats",
+      "description": "Statistics for corporate and local ads."
+    },
+    "/admin_config/setup": {
+      "schema": "object",
+      "description": "One-time admin setup configuration."
+    }
+  }
+}

@@ -1,0 +1,8 @@
+<svg width="1080" height="1920" viewBox="0 0 1080 1920" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1080" height="1920" fill="#059669"/>
+  <circle cx="540" cy="800" r="300" fill="white" fill-opacity="0.1"/>
+  <path d="M540 600L480 800H550L530 950L620 750H550L570 600H540Z" fill="#F97316" stroke="white" stroke-width="10"/>
+  <text x="540" y="1100" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="120" fill="white">GRAM SHAKTI</text>
+  <text x="540" y="1250" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="60" fill="#F97316">भारत का अपना लोकल मार्केट</text>
+  <text x="540" y="1700" text-anchor="middle" font-family="Arial, sans-serif" font-weight="400" font-size="30" fill="white" fill-opacity="0.6">Empowering Rural India</text>
+</svg>

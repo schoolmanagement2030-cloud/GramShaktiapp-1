@@ -1,0 +1,7 @@
+{
+  "name": "Gram Shakti",
+  "description": "A local service and worker finder for rural India. Find workers, shops, and mechanics near you.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
