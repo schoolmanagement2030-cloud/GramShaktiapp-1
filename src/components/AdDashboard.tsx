@@ -36,7 +36,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     paymentScreenshot: '',
   });
 
-  // Auth listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       setUser(u);
@@ -46,7 +45,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     return () => unsubscribe();
   }, []);
 
-  // Fetch my ads and stats
   useEffect(() => {
     if (user && view === 'dashboard') {
       const q = query(collection(db, 'active_banners'), where('uid', '==', user.uid));
@@ -54,6 +52,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
         const ads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActiveBanner));
         setMyAds(ads);
         
+        // Fetch stats for each ad
         ads.forEach(async (ad) => {
           if (!ad.id) return;
           const statsDoc = await getDoc(doc(db, 'ad_stats', ad.id));
@@ -66,7 +65,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     }
   }, [user, view]);
 
-  // Google login
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
@@ -83,7 +81,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     auth.signOut();
   };
 
-  // Handle image/file change
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'paymentScreenshot') => {
     const file = e.target.files?.[0];
     if (file) {
@@ -202,7 +199,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
               </motion.div>
             )}
 
-            {/* Dashboard View */}
             {view === 'dashboard' && (
               <motion.div
                 key="dashboard"
@@ -282,7 +278,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
               </motion.div>
             )}
 
-            {/* Post Ad View */}
             {view === 'post' && (
               <motion.div
                 key="post"
@@ -290,7 +285,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-8"
               >
-                {/* Back Button & Header */}
                 <div className="flex items-center gap-4">
                   <button 
                     onClick={() => setView('dashboard')} 
@@ -304,7 +298,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                   </div>
                 </div>
 
-                {/* Step 1: Ad Details */}
                 {step === 1 && (
                   <div className="space-y-6">
                     <div className="space-y-3">
@@ -336,7 +329,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                       </div>
                     </div>
 
-                    {/* Corporate Website */}
                     {formData.adType === 'Corporate' && (
                       <div className="space-y-3">
                         <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Website URL</label>
@@ -350,7 +342,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                       </div>
                     )}
 
-                    {/* Ad Text */}
                     <div className="space-y-3">
                       <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Text</label>
                       <textarea
@@ -361,7 +352,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                       />
                     </div>
 
-                    {/* Ad Image Upload */}
                     <div className="space-y-3">
                       <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Image</label>
                       <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center hover:border-emerald-500 transition-all bg-slate-50/50 group">
@@ -369,4 +359,156 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                         {formData.image ? (
                           <div className="relative inline-block">
                             <img src={formData.image} alt="Preview" className="max-h-40 rounded-2xl shadow-lg" />
-                            <div className="absolute inset-
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
+                              <p className="text-white text-xs font-black">CHANGE IMAGE</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-slate-400">
+                            <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                              <Upload size={24} />
+                            </div>
+                            <p className="text-sm font-black">Click to upload ad creative</p>
+                            <p className="text-[10px] mt-1 font-bold">JPG, PNG up to 5MB</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Target Area</label>
+                        <select 
+                          value={formData.targetLevel} 
+                          onChange={(e) => setFormData({ ...formData, targetLevel: e.target.value as TargetLevel })} 
+                          className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold appearance-none"
+                        >
+                          <option value="India">All India</option>
+                          <option value="State">State Level</option>
+                          <option value="District">District Level</option>
+                          <option value="Tehsil">Tehsil Level</option>
+                        </select>
+                      </div>
+                      <div className="space-y-3">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Area Name</label>
+                        <input 
+                          type="text" 
+                          value={formData.targetValue} 
+                          onChange={(e) => setFormData({ ...formData, targetValue: e.target.value })} 
+                          placeholder="e.g. Rajasthan" 
+                          className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Select Plan</label>
+                      <div className="grid grid-cols-3 gap-4">
+                        {plans.map((p) => (
+                          <button 
+                            key={p.days} 
+                            onClick={() => setFormData({ ...formData, plan: p.days as AdPlan })} 
+                            className={`p-5 rounded-2xl border-2 text-sm font-black transition-all flex flex-col items-center gap-1 ${
+                              formData.plan === p.days 
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xl shadow-emerald-100' 
+                                : 'bg-white text-slate-600 border-slate-100 hover:border-emerald-200'
+                            }`}
+                          >
+                            <span className="text-lg">{p.days}</span>
+                            <span className="text-[10px] uppercase tracking-widest opacity-60">Days</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-emerald-900 p-8 rounded-[2rem] text-white flex justify-between items-center shadow-xl relative overflow-hidden">
+                      <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+                      <div className="relative">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 mb-1">Total Investment</p>
+                        <span className="text-4xl font-black">₹{calculatePrice()}</span>
+                      </div>
+                      <button 
+                        onClick={() => setStep(2)} 
+                        className="relative bg-orange-500 hover:bg-orange-600 text-white font-black px-8 py-4 rounded-2xl transition-all shadow-lg shadow-orange-900/20 transform active:scale-95"
+                      >
+                        NEXT: PAYMENT
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {step === 2 && (
+                  <div className="space-y-8 text-center py-8">
+                    <div className="space-y-4">
+                      <h3 className="text-2xl font-black text-slate-900">Scan to Pay</h3>
+                      <p className="text-slate-500 text-sm font-medium max-w-xs mx-auto">Complete your payment of <span className="text-emerald-600 font-black">₹{calculatePrice()}</span> to activate your campaign.</p>
+                      <div className="bg-white p-6 border-4 border-slate-50 rounded-[2.5rem] inline-block shadow-2xl">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikas123metro01@okaxis&pn=Gram%20Shakti&am=" alt="QR" className="w-56 h-56" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 text-left max-w-md mx-auto">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Upload Payment Screenshot</label>
+                      <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center hover:border-emerald-500 transition-all bg-slate-50/50 group">
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'paymentScreenshot')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        {formData.paymentScreenshot ? (
+                          <div className="relative inline-block">
+                            <img src={formData.paymentScreenshot} alt="Screenshot" className="max-h-40 rounded-2xl shadow-lg" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
+                              <p className="text-white text-xs font-black">CHANGE SCREENSHOT</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-slate-400">
+                            <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                              <CreditCard size={24} />
+                            </div>
+                            <p className="text-sm font-black">Click to upload payment proof</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4 max-w-md mx-auto pt-4">
+                      <button 
+                        onClick={() => setStep(1)} 
+                        className="flex-1 bg-slate-100 text-slate-600 font-black py-5 rounded-2xl hover:bg-slate-200 transition-all"
+                      >
+                        BACK
+                      </button>
+                      <button 
+                        onClick={handleSubmitAd} 
+                        disabled={isLoading || !formData.paymentScreenshot} 
+                        className="flex-[2] bg-emerald-600 text-white font-black py-5 rounded-2xl hover:bg-emerald-700 disabled:bg-slate-300 transition-all shadow-xl shadow-emerald-100 transform active:scale-95"
+                      >
+                        {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'SUBMIT CAMPAIGN'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {step === 4 && (
+                  <div className="text-center py-20 space-y-6">
+                    <div className="bg-emerald-50 w-24 h-24 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner">
+                      <CheckCircle className="text-emerald-600" size={48} />
+                    </div>
+                    <div className="space-y-2">
+                      <h2 className="text-3xl font-black text-slate-900">Campaign Submitted!</h2>
+                      <p className="text-slate-500 font-medium max-w-xs mx-auto">Our team will review and activate your ad within 24 hours.</p>
+                    </div>
+                    <button 
+                      onClick={() => setView('dashboard')} 
+                      className="bg-emerald-600 text-white font-black py-5 px-12 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 transform active:scale-95"
+                    >
+                      GO TO DASHBOARD
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
