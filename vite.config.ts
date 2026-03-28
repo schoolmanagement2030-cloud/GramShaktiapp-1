@@ -4,12 +4,16 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig({
-  // इसे बिल्कुल ऐसे ही रखें
-  base: './', 
+  // खाली स्ट्रिंग सबसे बेस्ट काम करती है GitHub के लिए
+  base: '', 
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
     },
   },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+  }
 });
