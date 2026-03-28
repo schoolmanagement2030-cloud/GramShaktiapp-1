@@ -20,7 +20,7 @@ export default function App() {
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
   const [filteredWorkers, setFilteredWorkers] = useState<WorkerProfile[]>([]);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]); // Default India center
+  const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]); 
   const [filters, setFilters] = useState<SearchFilters>({ category: '', keyword: '' });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,8 +30,23 @@ export default function App() {
   const [activeAds, setActiveAds] = useState<ActiveBanner[]>([]);
   const [stickyAds, setStickyAds] = useState<ActiveBanner[]>([]);
   const [shaktiClicks, setShaktiClicks] = useState(0);
+  
+  // क्लिक काउंट के लिए नई स्टेट
+  const [globalClickCount, setGlobalClickCount] = useState(0);
+
   const [detectedLocation, setDetectedLocation] = useState<{ state?: string; district?: string; tehsil?: string }>({ state: 'Rajasthan', district: 'Jaipur', tehsil: 'Sanganer' });
   const shaktiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // क्लिक हैंडलर - 2, 4, 6 क्लिक पर एड्स दिखाएगा
+  const handleGlobalClick = () => {
+    setGlobalClickCount(prev => {
+      const nextCount = prev + 1;
+      if (nextCount === 2 || nextCount === 4 || nextCount === 6) {
+        setIsAdModalOpen(true);
+      }
+      return nextCount;
+    });
+  };
 
   const fetchWorkers = async () => {
     setIsLoading(true);
@@ -57,32 +72,22 @@ export default function App() {
 
     fetchWorkers();
 
-    // Detect Location (Simulated for demo)
-    // setDetectedLocation({ state: 'Rajasthan', district: 'Jaipur', tehsil: 'Sanganer' });
-
-    // Fetch Active Ads
     const adsQuery = query(collection(db, 'active_banners'), limit(10));
     const unsubscribeAds = onSnapshot(adsQuery, (snapshot) => {
       const ads = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ActiveBanner));
-      
       const today = new Date().toDateString();
       const viewCounts = JSON.parse(localStorage.getItem('ad_views') || '{}');
       
       const filteredAds = ads.filter(ad => {
         if (new Date(ad.expiryDate) < new Date()) return false;
-        
         const matchesLocation = 
           ad.targetLevel === 'India' ||
           (ad.targetLevel === 'State' && ad.targetValue === detectedLocation.state) ||
           (ad.targetLevel === 'District' && ad.targetValue === detectedLocation.district) ||
           (ad.targetLevel === 'Tehsil' && ad.targetValue === detectedLocation.tehsil);
-          
-        if (!matchesLocation) return false;
-
-        return true;
+        return matchesLocation;
       });
 
-      // Separate Sticky Ads (Corporate + India/State)
       const sticky = filteredAds.filter(ad => 
         ad.adType === 'Corporate' && (ad.targetLevel === 'India' || ad.targetLevel === 'State')
       );
@@ -91,7 +96,6 @@ export default function App() {
       setStickyAds(sticky);
       setActiveAds(scrolling);
       
-      // Track Views for Corporate Ads
       filteredAds.forEach(async (ad) => {
         if (ad.adType === 'Corporate' && ad.id) {
           const adKey = `${ad.id}_${today}`;
@@ -119,33 +123,8 @@ export default function App() {
       }
       return next;
     });
-
     if (shaktiTimeoutRef.current) clearTimeout(shaktiTimeoutRef.current);
     shaktiTimeoutRef.current = setTimeout(() => setShaktiClicks(0), 2000);
-  };
-
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Login failed:", error);
-    }
-  };
-
-  const handleLogout = () => signOut(auth);
-
-  const handleFirestoreError = (error: any, operation: string, path: string) => {
-    const errInfo = {
-      error: error.message || String(error),
-      operation,
-      path,
-      auth: {
-        uid: auth.currentUser?.uid,
-        email: auth.currentUser?.email
-      }
-    };
-    console.error('Firestore Error:', JSON.stringify(errInfo));
   };
 
   const trackAdEvent = async (adId: string, type: 'views' | 'clicks' | 'calls') => {
@@ -153,18 +132,8 @@ export default function App() {
       const statsRef = doc(db, 'ad_stats', adId);
       const statsDoc = await getDoc(statsRef);
       const today = new Date().toISOString().split('T')[0];
-      
-      const fieldMap = {
-        views: 'views_count',
-        clicks: 'click_count',
-        calls: 'call_action_count'
-      };
-
-      const dailyFieldMap = {
-        views: 'views',
-        clicks: 'clicks',
-        calls: 'calls'
-      };
+      const fieldMap = { views: 'views_count', clicks: 'click_count', calls: 'call_action_count' };
+      const dailyFieldMap = { views: 'views', clicks: 'clicks', calls: 'calls' };
 
       if (!statsDoc.exists()) {
         const initialStats: AdStats = {
@@ -172,13 +141,7 @@ export default function App() {
           views_count: type === 'views' ? 1 : 0,
           click_count: type === 'clicks' ? 1 : 0,
           call_action_count: type === 'calls' ? 1 : 0,
-          daily_stats: {
-            [today]: {
-              views: type === 'views' ? 1 : 0,
-              clicks: type === 'clicks' ? 1 : 0,
-              calls: type === 'calls' ? 1 : 0,
-            }
-          },
+          daily_stats: { [today]: { views: type === 'views' ? 1 : 0, clicks: type === 'clicks' ? 1 : 0, calls: type === 'calls' ? 1 : 0 } },
           lastUpdated: new Date().toISOString(),
         };
         await setDoc(statsRef, initialStats);
@@ -190,7 +153,7 @@ export default function App() {
         });
       }
     } catch (error: any) {
-      handleFirestoreError(error, 'write', `ad_stats/${adId}`);
+      console.error('Firestore Error:', error);
     }
   };
 
@@ -200,8 +163,7 @@ export default function App() {
       if (ad.adType === 'Corporate' && ad.websiteUrl) {
         window.open(ad.websiteUrl, '_blank');
       } else if (ad.uid) {
-        // For local ads, maybe trigger a call or show details
-        window.location.href = `tel:${ad.uid}`; // Assuming uid might be mobile or linked to profile
+        window.location.href = `tel:${ad.uid}`;
         await trackAdEvent(ad.id, 'calls');
       }
     }
@@ -214,23 +176,18 @@ export default function App() {
         const { latitude, longitude } = position.coords;
         setUserLocation([latitude, longitude]);
         setMapCenter([latitude, longitude]);
-
         const filtered = workers.filter(worker => {
           const distance = getDistance(latitude, longitude, worker.location.lat, worker.location.lng);
           const matchesCategory = !filters.category || worker.category === filters.category;
           const matchesKeyword = !filters.keyword || 
             worker.skills.toLowerCase().includes(filters.keyword.toLowerCase()) ||
-            worker.name.toLowerCase().includes(filters.keyword.toLowerCase()) ||
-            worker.category.toLowerCase().includes(filters.keyword.toLowerCase());
-          
+            worker.name.toLowerCase().includes(filters.keyword.toLowerCase());
           return distance <= 10 && matchesCategory && matchesKeyword;
         });
-
         setFilteredWorkers(filtered);
         setIsLoading(false);
       },
-      (error) => {
-        console.error('Error getting location:', error);
+      () => {
         alert('Please enable GPS to find nearby services.');
         setIsLoading(false);
       }
@@ -238,8 +195,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* Header */}
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900" onClick={handleGlobalClick}>
+      {/* Header Updated */}
       <header className="bg-emerald-700 text-white sticky top-0 z-[100] shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
@@ -248,53 +205,40 @@ export default function App() {
                 <Tractor className="text-emerald-700" size={32} />
               </div>
               <h1 className="text-2xl font-black tracking-tighter flex items-center">
-                GRAM <span onClick={handleShaktiClick} className="text-orange-400 ml-1 cursor-default select-none">SHAKTI</span>
+                GRAM <span onClick={(e) => { e.stopPropagation(); handleShaktiClick(); }} className="text-orange-400 ml-1 cursor-default select-none">SHAKTI</span>
               </h1>
             </div>
 
             <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setIsAdModalOpen(true)}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center gap-2 transition-all shadow-lg shadow-orange-900/20 transform active:scale-95"
+              {/* Registration Button - Now Primary and visible on all screens */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setActiveTab('register'); }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-black transition-all shadow-lg transform active:scale-95 ${
+                  activeTab === 'register' ? 'bg-orange-500 text-white shadow-orange-900/20' : 'bg-emerald-800/50 text-white hover:bg-emerald-600'
+                }`}
               >
-                <Plus size={20} />
-                POST AD / विज्ञापन डालें
+                <UserPlus size={18} />
+                Register / पंजीकरण
               </button>
               
-              <div className="hidden md:flex bg-emerald-800/50 p-1 rounded-2xl">
-                <button
-                  onClick={() => setActiveTab('search')}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${
-                    activeTab === 'search' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-100 hover:bg-emerald-700/50'
-                  }`}
-                >
-                  <Search size={18} />
-                  Find / खोजें
-                </button>
-                <button
-                  onClick={() => setActiveTab('register')}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${
-                    activeTab === 'register' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-100 hover:bg-emerald-700/50'
-                  }`}
-                >
-                  <UserPlus size={18} />
-                  Register / पंजीकरण
-                </button>
-              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); setActiveTab('search'); }}
+                className={`hidden md:flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold transition-all ${
+                  activeTab === 'search' ? 'bg-white text-emerald-700 shadow-sm' : 'text-emerald-100 hover:bg-emerald-700/50'
+                }`}
+              >
+                <Search size={18} />
+                Find / खोजें
+              </button>
             </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Sticky Ads Banner */}
         <AnimatePresence>
           {stickyAds.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-8"
-            >
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
               <div className="bg-blue-600 rounded-[2rem] p-1 shadow-xl overflow-hidden">
                 <div className="bg-white/10 backdrop-blur-md px-4 py-2 flex items-center justify-between text-white text-[10px] font-black uppercase tracking-widest">
                   <span className="flex items-center gap-2"><ShieldCheck size={14} /> Featured Brands / प्रमुख ब्रांड</span>
@@ -302,20 +246,14 @@ export default function App() {
                 </div>
                 <div className="flex overflow-x-auto gap-4 p-4 no-scrollbar">
                   {stickyAds.map(ad => (
-                    <div 
-                      key={ad.id} 
-                      onClick={() => handleAdClick(ad)}
-                      className="flex-shrink-0 w-80 bg-white rounded-2xl p-4 flex gap-4 cursor-pointer hover:shadow-lg transition-all border border-blue-100"
-                    >
+                    <div key={ad.id} onClick={(e) => { e.stopPropagation(); handleAdClick(ad); }} className="flex-shrink-0 w-80 bg-white rounded-2xl p-4 flex gap-4 cursor-pointer hover:shadow-lg border border-blue-100 transition-all">
                       <div className="w-20 h-20 bg-slate-50 rounded-xl overflow-hidden flex-shrink-0">
                         {ad.image && <img src={ad.image} alt="" className="w-full h-full object-cover" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-black text-slate-900 text-sm truncate">{ad.text}</h4>
                         <p className="text-xs text-slate-500 mt-1 line-clamp-2">{ad.adType} Campaign</p>
-                        <button className="mt-2 text-[10px] font-black text-blue-600 flex items-center gap-1">
-                          VIEW DETAILS <ChevronRight size={12} />
-                        </button>
+                        <button className="mt-2 text-[10px] font-black text-blue-600 flex items-center gap-1">VIEW DETAILS <ChevronRight size={12} /></button>
                       </div>
                     </div>
                   ))}
@@ -327,137 +265,70 @@ export default function App() {
 
         <AnimatePresence mode="wait">
           {activeTab === 'search' ? (
-            <motion.div
-              key="search"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-8"
-            >
-              {/* Left Column: Search & Map */}
+            <motion.div key="search" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-8 space-y-8">
-                <SearchForm 
-                  filters={filters} 
-                  setFilters={setFilters} 
-                  onSearch={handleSearch} 
-                  isLoading={isLoading} 
-                />
-
+                <div onClick={(e) => e.stopPropagation()}>
+                  <SearchForm filters={filters} setFilters={setFilters} onSearch={handleSearch} isLoading={isLoading} />
+                </div>
                 <div className="bg-white p-4 rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden h-[500px] relative">
-                  <div className="absolute top-8 left-8 z-10 bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-lg border border-slate-100 flex items-center gap-3">
-                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-xs font-bold text-slate-700">Live Service Map / लाइव सेवा मानचित्र</span>
-                  </div>
-                  <Map 
-                    center={mapCenter} 
-                    workers={filteredWorkers} 
-                    userLocation={userLocation} 
-                  />
+                  <Map center={mapCenter} workers={filteredWorkers} userLocation={userLocation} />
                 </div>
               </div>
 
-              {/* Right Column: Local Ads & Info */}
               <div className="lg:col-span-4 space-y-8">
                 <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
-                  <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3">
-                    <Store className="text-orange-500" />
-                    Local Offers / स्थानीय ऑफर
-                  </h3>
+                  <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3"><Store className="text-orange-500" /> Local Offers</h3>
                   <div className="space-y-4">
                     {activeAds.length === 0 ? (
                       <div className="text-center py-12 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-                        <Info className="mx-auto text-slate-300 mb-2" />
-                        <p className="text-slate-400 text-sm font-bold">No local ads in your area.</p>
+                        <Info className="mx-auto text-slate-300 mb-2" /><p className="text-slate-400 text-sm font-bold">No local ads in your area.</p>
                       </div>
                     ) : (
                       activeAds.map(ad => (
-                        <motion.div
-                          key={ad.id}
-                          whileHover={{ scale: 1.02 }}
-                          onClick={() => handleAdClick(ad)}
-                          className="bg-slate-50 p-4 rounded-3xl border border-slate-100 cursor-pointer hover:bg-white hover:shadow-md transition-all group"
-                        >
+                        <div key={ad.id} onClick={(e) => { e.stopPropagation(); handleAdClick(ad); }} className="bg-slate-50 p-4 rounded-3xl border border-slate-100 cursor-pointer hover:bg-white transition-all">
                           <div className="flex gap-4">
-                            <div className="w-20 h-20 bg-white rounded-2xl overflow-hidden flex-shrink-0 border border-slate-100">
+                            <div className="w-20 h-20 bg-white rounded-2xl overflow-hidden border border-slate-100">
                               {ad.image && <img src={ad.image} alt="" className="w-full h-full object-cover" />}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-bold text-slate-900 text-sm group-hover:text-emerald-700 transition-colors">{ad.text}</h4>
-                              <div className="flex items-center gap-2 mt-2">
-                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase">
-                                  {ad.targetValue}
-                                </span>
-                              </div>
-                            </div>
+                            <div className="flex-1 min-w-0"><h4 className="font-bold text-slate-900 text-sm">{ad.text}</h4></div>
                           </div>
-                        </motion.div>
+                        </div>
                       ))
                     )}
                   </div>
                 </div>
 
-                <div className="bg-emerald-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden group">
-                  <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:scale-150 transition-transform duration-700" />
-                  <h3 className="text-xl font-black mb-4 relative">Grow Your Business!</h3>
-                  <p className="text-emerald-100 text-sm leading-relaxed mb-6 relative">
-                    Reach thousands of local customers in your village and tehsil. Start your ad campaign today!
-                  </p>
-                  <button 
-                    onClick={() => setIsAdModalOpen(true)}
-                    className="w-full bg-white text-emerald-900 font-black py-4 rounded-2xl hover:bg-orange-400 hover:text-white transition-all relative shadow-lg"
-                  >
-                    GET STARTED NOW
-                  </button>
+                <div className="bg-emerald-900 rounded-[2.5rem] p-8 text-white shadow-xl relative overflow-hidden">
+                  <h3 className="text-xl font-black mb-4">Grow Your Business!</h3>
+                  <p className="text-emerald-100 text-sm mb-6">Reach thousands of local customers in your village.</p>
+                  <button onClick={(e) => { e.stopPropagation(); setIsAdModalOpen(true); }} className="w-full bg-white text-emerald-900 font-black py-4 rounded-2xl hover:bg-orange-400 hover:text-white transition-all">GET STARTED NOW</button>
                 </div>
               </div>
             </motion.div>
           ) : activeTab === 'register' ? (
-            <motion.div
-              key="register"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto"
-            >
-              <WorkerRegistration />
+            <motion.div key="register" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-4xl mx-auto">
+              <div onClick={(e) => e.stopPropagation()}><WorkerRegistration /></div>
             </motion.div>
           ) : (
-            <motion.div
-              key="privacy"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="max-w-4xl mx-auto"
-            >
+            <motion.div key="privacy" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-4xl mx-auto">
               <PrivacyPolicy onBack={() => setActiveTab('search')} />
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
-      {/* Footer */}
       <footer className="bg-slate-900 text-slate-500 py-12 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center">
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <Tractor size={24} className="text-emerald-500" />
-            <span className="text-white font-black text-xl tracking-tighter">GRAM SHAKTI</span>
-          </div>
-          <p className="text-sm max-w-md mx-auto mb-8">
-            Empowering rural India with digital connectivity. Find local skills, services, and opportunities.
-          </p>
-          <div className="flex justify-center gap-8 text-xs font-bold uppercase tracking-widest">
-            <button onClick={() => setActiveTab('privacy')} className="hover:text-white transition-colors">Privacy</button>
-            <a href="#" className="hover:text-white transition-colors">Terms</a>
-            <a href="#" className="hover:text-white transition-colors">Contact</a>
-          </div>
-          <div className="mt-12 pt-8 border-t border-slate-800 text-[10px]">
-            © 2026 Gram Shakti. All rights reserved.
-          </div>
+          <div className="flex items-center justify-center gap-2 mb-6"><Tractor size={24} className="text-emerald-500" /><span className="text-white font-black text-xl tracking-tighter">GRAM SHAKTI</span></div>
+          <div className="mt-12 pt-8 border-t border-slate-800 text-[10px]">© 2026 Gram Shakti. All rights reserved.</div>
         </div>
       </footer>
 
-      <AdminPanel isOpen={isAdminPanelOpen} onClose={() => setIsAdminPanelOpen(false)} />
-      <AdDashboard isOpen={isAdModalOpen} onClose={() => setIsAdModalOpen(false)} />
+      {/* Modals with propagation stop to prevent click count increase */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <AdminPanel isOpen={isAdminPanelOpen} onClose={() => setIsAdminPanelOpen(false)} />
+        <AdDashboard isOpen={isAdModalOpen} onClose={() => { setIsAdModalOpen(false); setGlobalClickCount(0); }} />
+      </div>
     </div>
   );
 }
