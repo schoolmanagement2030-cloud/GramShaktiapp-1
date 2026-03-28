@@ -4,7 +4,7 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig({
-  // यह लाइन सबसे जरूरी है, इसे बिल्कुल ऐसे ही लिखें
+  // इसे बिल्कुल ऐसे ही रखें
   base: './', 
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -12,8 +12,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, '.'),
     },
   },
-  build: {
-    outDir: 'dist',
-    assetsDir: 'assets',
-  }
 });
