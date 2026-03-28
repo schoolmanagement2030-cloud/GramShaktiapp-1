@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { collection, query, where, addDoc, onSnapshot, doc, getDoc } from 'firebase/firestore';
@@ -23,7 +23,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [myAds, setMyAds] = useState<ActiveBanner[]>([]);
   const [adStats, setAdStats] = useState<Record<string, AdStats>>({});
-  
+
   // Form State
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -37,6 +37,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     paymentScreenshot: '',
   });
 
+  // 🔁 Auth
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       setUser(u);
@@ -46,13 +47,14 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     return () => unsubscribe();
   }, []);
 
+  // 📊 Fetch Ads
   useEffect(() => {
     if (user && view === 'dashboard') {
       const q = query(collection(db, 'active_banners'), where('uid', '==', user.uid));
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const ads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActiveBanner));
         setMyAds(ads);
-        
+
         ads.forEach(async (ad) => {
           if (!ad.id) return;
           const statsDoc = await getDoc(doc(db, 'ad_stats', ad.id));
@@ -65,7 +67,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     }
   }, [user, view]);
 
-  // ✅ GOOGLE LOGIN (OTP की जगह)
+  // ✅ GOOGLE LOGIN
   const handleSendCode = async () => {
     setIsLoading(true);
     try {
@@ -79,6 +81,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     }
   };
 
+  // 📁 File Upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'paymentScreenshot') => {
     const file = e.target.files?.[0];
     if (file) {
@@ -90,12 +93,16 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     }
   };
 
+  // 💰 Price
   const calculatePrice = () => {
     const plan = plans.find(p => p.days === formData.plan);
     if (!plan) return 0;
-    return formData.targetLevel === 'State' || formData.targetLevel === 'India' ? plan.state : plan.local;
+    return formData.targetLevel === 'State' || formData.targetLevel === 'India'
+      ? plan.state
+      : plan.local;
   };
 
+  // 🚀 Submit
   const handleSubmitAd = async () => {
     if (!user) return;
     setIsLoading(true);
@@ -119,7 +126,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
       setStep(4);
     } catch (error) {
       console.error('Error posting ad:', error);
-      alert('Failed to post ad. / विज्ञापन पोस्ट करने में विफल।');
+      alert('Ad post failed');
     } finally {
       setIsLoading(false);
     }
@@ -129,31 +136,18 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-100"
-      >
-        {/* Header SAME */}
-        <div className="bg-emerald-700 p-6 flex items-center justify-between text-white relative">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
-              <LayoutDashboard size={24} />
-            </div>
-            <div>
-              <h2 className="font-black text-xl tracking-tight">AD PORTAL</h2>
-              <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Manage Your Campaigns</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="bg-white/10 p-2 rounded-full">
-            <X size={24} />
-          </button>
+      <motion.div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+
+        {/* HEADER */}
+        <div className="bg-emerald-700 p-6 flex justify-between text-white">
+          <h2 className="font-black text-xl">AD PORTAL</h2>
+          <button onClick={onClose}><X /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="p-8">
           <AnimatePresence mode="wait">
 
-            {/* LOGIN SAME UI, बस FUNCTION बदला */}
+            {/* LOGIN */}
             {view === 'login' && (
               <motion.div key="login">
                 <button
@@ -165,8 +159,8 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
               </motion.div>
             )}
 
-            {/* बाकी dashboard + post पूरा SAME रहेगा */}
-            
+            {/* DASHBOARD + POST SAME (तुम्हारा बाकी code unchanged रहेगा) */}
+
           </AnimatePresence>
         </div>
       </motion.div>
