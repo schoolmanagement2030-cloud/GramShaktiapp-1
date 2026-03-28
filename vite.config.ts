@@ -4,8 +4,8 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig({
-  // खाली स्ट्रिंग सबसे बेस्ट काम करती है GitHub के लिए
-  base: '', 
+  // यह आपके GitHub URL का आखिरी हिस्सा है
+  base: '/GramShaktiapp-1/', 
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -15,5 +15,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    emptyOutDir: true,
   }
 });
