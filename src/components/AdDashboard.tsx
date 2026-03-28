@@ -23,6 +23,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
   const [myAds, setMyAds] = useState<ActiveBanner[]>([]);
   const [adStats, setAdStats] = useState<Record<string, AdStats>>({});
   
+  // Form State
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     text: '',
@@ -39,33 +40,33 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       setUser(u);
-      setView(u ? 'dashboard' : 'login');
+      if (u) setView('dashboard');
+      else setView('login');
     });
     return () => unsubscribe();
   }, []);
 
-  // Fetch user's active ads
+  // Fetch my ads and stats
   useEffect(() => {
-    if (!user || view !== 'dashboard') return;
-    const q = query(collection(db, 'active_banners'), where('uid', '==', user.uid));
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const ads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActiveBanner));
-      setMyAds(ads);
-
-      const statsPromises = ads.map(async ad => {
-        if (!ad.id) return null;
-        const statsDoc = await getDoc(doc(db, 'ad_stats', ad.id));
-        if (statsDoc.exists()) return { id: ad.id, data: statsDoc.data() as AdStats };
-        return null;
+    if (user && view === 'dashboard') {
+      const q = query(collection(db, 'active_banners'), where('uid', '==', user.uid));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const ads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActiveBanner));
+        setMyAds(ads);
+        
+        ads.forEach(async (ad) => {
+          if (!ad.id) return;
+          const statsDoc = await getDoc(doc(db, 'ad_stats', ad.id));
+          if (statsDoc.exists()) {
+            setAdStats(prev => ({ ...prev, [ad.id!]: statsDoc.data() as AdStats }));
+          }
+        });
       });
-      const statsResults = await Promise.all(statsPromises);
-      const statsObj: Record<string, AdStats> = {};
-      statsResults.forEach(s => { if (s) statsObj[s.id] = s.data; });
-      setAdStats(statsObj);
-    });
-    return () => unsubscribe();
+      return () => unsubscribe();
+    }
   }, [user, view]);
 
+  // Google login
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
@@ -82,20 +83,22 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     auth.signOut();
   };
 
+  // Handle image/file change
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'paymentScreenshot') => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData(prev => ({ ...prev, [field]: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, [field]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const calculatePrice = () => {
     const plan = plans.find(p => p.days === formData.plan);
     if (!plan) return 0;
-    return ['State', 'India'].includes(formData.targetLevel) ? plan.state : plan.local;
+    return formData.targetLevel === 'State' || formData.targetLevel === 'India' ? plan.state : plan.local;
   };
 
   const handleSubmitAd = async () => {
@@ -116,6 +119,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
+
       await addDoc(collection(db, 'pending_ads'), adData);
       setStep(4);
     } catch (error) {
@@ -167,7 +171,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
 
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
           <AnimatePresence mode="wait">
-            {/* LOGIN VIEW */}
             {view === 'login' && (
               <motion.div
                 key="login"
@@ -199,7 +202,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
               </motion.div>
             )}
 
-            {/* DASHBOARD VIEW */}
+            {/* Dashboard View */}
             {view === 'dashboard' && (
               <motion.div
                 key="dashboard"
@@ -207,12 +210,79 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                 animate={{ opacity: 1 }}
                 className="space-y-8"
               >
-                {/* My Campaigns + Post Button */}
-                {/* ... Dashboard rendering same as original ... */}
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">My Campaigns</h3>
+                    <p className="text-slate-500 text-sm font-medium">Track your ad performance in real-time</p>
+                  </div>
+                  <button
+                    onClick={() => { setView('post'); setStep(1); }}
+                    className="bg-orange-500 text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 transform active:scale-95"
+                  >
+                    <Plus size={20} />
+                    POST NEW AD
+                  </button>
+                </div>
+
+                <div className="grid gap-6">
+                  {myAds.length === 0 ? (
+                    <div className="text-center py-20 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+                      <Megaphone className="mx-auto text-slate-300 mb-4" size={48} />
+                      <p className="text-slate-400 font-black text-lg">No active ads found.</p>
+                      <p className="text-slate-400 text-sm mt-1">Start your first campaign today!</p>
+                    </div>
+                  ) : (
+                    myAds.map((ad) => (
+                      <div key={ad.id} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all group">
+                        <div className="flex flex-col sm:flex-row gap-6">
+                          <div className="w-full sm:w-24 h-24 bg-slate-50 rounded-2xl overflow-hidden flex-shrink-0 border border-slate-100">
+                            {ad.image && <img src={ad.image} alt="Ad" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-wider ${ad.adType === 'Corporate' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                  {ad.adType}
+                                </span>
+                                {ad.adType === 'Corporate' && <ShieldCheck size={14} className="text-blue-500" />}
+                              </div>
+                              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{new Date(ad.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <h4 className="text-lg font-black text-slate-800 mb-4 line-clamp-1">{ad.text}</h4>
+                            
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                <div className="flex items-center gap-2 text-blue-500 mb-1">
+                                  <Eye size={14} />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Views</span>
+                                </div>
+                                <p className="text-lg font-black text-slate-900">{adStats[ad.id!]?.views_count || 0}</p>
+                              </div>
+                              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                <div className="flex items-center gap-2 text-emerald-500 mb-1">
+                                  <PhoneCall size={14} />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Calls</span>
+                                </div>
+                                <p className="text-lg font-black text-slate-900">{adStats[ad.id!]?.call_action_count || 0}</p>
+                              </div>
+                              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                <div className="flex items-center gap-2 text-orange-500 mb-1">
+                                  <TrendingUp size={14} />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Clicks</span>
+                                </div>
+                                <p className="text-lg font-black text-slate-900">{adStats[ad.id!]?.click_count || 0}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </motion.div>
             )}
 
-            {/* POST AD VIEW */}
+            {/* Post Ad View */}
             {view === 'post' && (
               <motion.div
                 key="post"
@@ -220,13 +290,83 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-8"
               >
-                {/* Post ad steps: 1, 2, 4 */}
-                {/* ... Same structure, FileReader safely handled ... */}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
+                {/* Back Button & Header */}
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => setView('dashboard')} 
+                    className="p-3 hover:bg-slate-100 rounded-2xl transition-all text-slate-400 hover:text-slate-900"
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">Create Campaign</h3>
+                    <p className="text-slate-500 text-sm font-medium">Fill in the details to reach your audience</p>
+                  </div>
+                </div>
+
+                {/* Step 1: Ad Details */}
+                {step === 1 && (
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Type</label>
+                      <div className="grid grid-cols-2 gap-4">
+                        {(['Local', 'Corporate'] as AdType[]).map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => setFormData({ ...formData, adType: type })}
+                            className={`p-5 rounded-2xl border-2 text-sm font-black transition-all flex flex-col items-center gap-2 ${
+                              formData.adType === type
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xl shadow-emerald-100'
+                                : 'bg-white text-slate-600 border-slate-100 hover:border-emerald-200'
+                            }`}
+                          >
+                            {type === 'Local' ? (
+                              <>
+                                <User size={24} />
+                                Individual/Local
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck size={24} />
+                                Branded Company
+                              </>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Corporate Website */}
+                    {formData.adType === 'Corporate' && (
+                      <div className="space-y-3">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Website URL</label>
+                        <input
+                          type="url"
+                          value={formData.websiteUrl}
+                          onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                          placeholder="https://yourbrand.com"
+                          className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold"
+                        />
+                      </div>
+                    )}
+
+                    {/* Ad Text */}
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Text</label>
+                      <textarea
+                        value={formData.text}
+                        onChange={(e) => setFormData({ ...formData, text: e.target.value })}
+                        placeholder="What are you offering? (e.g. Best Tractor Repair in Sanganer)"
+                        className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold h-32 resize-none"
+                      />
+                    </div>
+
+                    {/* Ad Image Upload */}
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Image</label>
+                      <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center hover:border-emerald-500 transition-all bg-slate-50/50 group">
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'image')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        {formData.image ? (
+                          <div className="relative inline-block">
+                            <img src={formData.image} alt="Preview" className="max-h-40 rounded-2xl shadow-lg" />
+                            <div className="absolute inset-
