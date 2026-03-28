@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { auth, db } from '../firebase';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth, db, signInWithGoogle } from '../firebase';
 import { collection, query, where, addDoc, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { TargetLevel, AdPlan, PendingAd, AdType, ActiveBanner, AdStats } from '../types';
-import { X, Upload, CreditCard, CheckCircle, Plus, Phone, ArrowRight, Loader2, TrendingUp, PhoneCall, Eye, ChevronLeft, LayoutDashboard, Megaphone, ShieldCheck, User } from 'lucide-react';
+import { X, Upload, CreditCard, CheckCircle, Plus, Loader2, TrendingUp, PhoneCall, Eye, ChevronLeft, LayoutDashboard, Megaphone, ShieldCheck, User, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AdDashboardProps {
@@ -23,7 +22,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [myAds, setMyAds] = useState<ActiveBanner[]>([]);
   const [adStats, setAdStats] = useState<Record<string, AdStats>>({});
-
+  
   // Form State
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -37,7 +36,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     paymentScreenshot: '',
   });
 
-  // 🔁 Auth
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => {
       setUser(u);
@@ -47,14 +45,14 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     return () => unsubscribe();
   }, []);
 
-  // 📊 Fetch Ads
   useEffect(() => {
     if (user && view === 'dashboard') {
       const q = query(collection(db, 'active_banners'), where('uid', '==', user.uid));
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const ads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActiveBanner));
         setMyAds(ads);
-
+        
+        // Fetch stats for each ad
         ads.forEach(async (ad) => {
           if (!ad.id) return;
           const statsDoc = await getDoc(doc(db, 'ad_stats', ad.id));
@@ -67,21 +65,22 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     }
   }, [user, view]);
 
-  // ✅ GOOGLE LOGIN
-  const handleSendCode = async () => {
+  const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      await signInWithGoogle();
     } catch (error) {
-      console.error('Google Login Error:', error);
-      alert('Login Failed / लॉगिन असफल');
+      console.error('Login Error:', error);
+      alert('Login failed. / लॉगिन विफल रहा।');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 📁 File Upload
+  const handleLogout = () => {
+    auth.signOut();
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'paymentScreenshot') => {
     const file = e.target.files?.[0];
     if (file) {
@@ -93,16 +92,12 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     }
   };
 
-  // 💰 Price
   const calculatePrice = () => {
     const plan = plans.find(p => p.days === formData.plan);
     if (!plan) return 0;
-    return formData.targetLevel === 'State' || formData.targetLevel === 'India'
-      ? plan.state
-      : plan.local;
+    return formData.targetLevel === 'State' || formData.targetLevel === 'India' ? plan.state : plan.local;
   };
 
-  // 🚀 Submit
   const handleSubmitAd = async () => {
     if (!user) return;
     setIsLoading(true);
@@ -126,7 +121,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
       setStep(4);
     } catch (error) {
       console.error('Error posting ad:', error);
-      alert('Ad post failed');
+      alert('Failed to post ad. / विज्ञापन पोस्ट करने में विफल।');
     } finally {
       setIsLoading(false);
     }
@@ -136,31 +131,381 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <motion.div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-
-        {/* HEADER */}
-        <div className="bg-emerald-700 p-6 flex justify-between text-white">
-          <h2 className="font-black text-xl">AD PORTAL</h2>
-          <button onClick={onClose}><X /></button>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-100"
+      >
+        {/* Header */}
+        <div className="bg-emerald-700 p-6 flex items-center justify-between text-white relative">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+              <LayoutDashboard size={24} />
+            </div>
+            <div>
+              <h2 className="font-black text-xl tracking-tight">AD PORTAL</h2>
+              <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Manage Your Campaigns</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {user && (
+              <button 
+                onClick={handleLogout}
+                className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all flex items-center gap-2 px-3"
+              >
+                <LogOut size={18} />
+                <span className="text-[10px] font-black uppercase">Logout</span>
+              </button>
+            )}
+            <button 
+              onClick={onClose} 
+              className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all"
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
-        <div className="p-8">
+        <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
           <AnimatePresence mode="wait">
-
-            {/* LOGIN */}
             {view === 'login' && (
-              <motion.div key="login">
+              <motion.div
+                key="login"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="max-w-sm mx-auto space-y-8 py-12"
+              >
+                <div className="text-center space-y-4">
+                  <div className="bg-emerald-50 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <User className="text-emerald-600" size={32} />
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-900">Login to Dashboard</h3>
+                  <p className="text-slate-500 text-sm font-medium">Use your Google account to manage your ads.</p>
+                </div>
+
                 <button
-                  onClick={handleSendCode}
-                  className="w-full bg-emerald-600 text-white py-5 rounded-2xl"
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                  className="w-full bg-white border-2 border-slate-100 text-slate-700 font-black py-5 rounded-2xl hover:bg-slate-50 transition-all flex items-center justify-center gap-3 shadow-xl shadow-slate-200/50 transform active:scale-95"
                 >
-                  {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'LOGIN WITH GOOGLE'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : (
+                    <>
+                      <img src="https://www.google.com/favicon.ico" alt="Google" className="w-6 h-6" />
+                      LOGIN WITH GOOGLE / गूगल से लॉगिन करें
+                    </>
+                  )}
                 </button>
               </motion.div>
             )}
 
-            {/* DASHBOARD + POST SAME (तुम्हारा बाकी code unchanged रहेगा) */}
+            {view === 'dashboard' && (
+              <motion.div
+                key="dashboard"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="space-y-8"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">My Campaigns</h3>
+                    <p className="text-slate-500 text-sm font-medium">Track your ad performance in real-time</p>
+                  </div>
+                  <button
+                    onClick={() => { setView('post'); setStep(1); }}
+                    className="bg-orange-500 text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 transform active:scale-95"
+                  >
+                    <Plus size={20} />
+                    POST NEW AD
+                  </button>
+                </div>
 
+                <div className="grid gap-6">
+                  {myAds.length === 0 ? (
+                    <div className="text-center py-20 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
+                      <Megaphone className="mx-auto text-slate-300 mb-4" size={48} />
+                      <p className="text-slate-400 font-black text-lg">No active ads found.</p>
+                      <p className="text-slate-400 text-sm mt-1">Start your first campaign today!</p>
+                    </div>
+                  ) : (
+                    myAds.map((ad) => (
+                      <div key={ad.id} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all group">
+                        <div className="flex flex-col sm:flex-row gap-6">
+                          <div className="w-full sm:w-24 h-24 bg-slate-50 rounded-2xl overflow-hidden flex-shrink-0 border border-slate-100">
+                            {ad.image && <img src={ad.image} alt="Ad" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-wider ${ad.adType === 'Corporate' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                  {ad.adType}
+                                </span>
+                                {ad.adType === 'Corporate' && <ShieldCheck size={14} className="text-blue-500" />}
+                              </div>
+                              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{new Date(ad.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <h4 className="text-lg font-black text-slate-800 mb-4 line-clamp-1">{ad.text}</h4>
+                            
+                            <div className="grid grid-cols-3 gap-4">
+                              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                <div className="flex items-center gap-2 text-blue-500 mb-1">
+                                  <Eye size={14} />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Views</span>
+                                </div>
+                                <p className="text-lg font-black text-slate-900">{adStats[ad.id!]?.views_count || 0}</p>
+                              </div>
+                              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                <div className="flex items-center gap-2 text-emerald-500 mb-1">
+                                  <PhoneCall size={14} />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Calls</span>
+                                </div>
+                                <p className="text-lg font-black text-slate-900">{adStats[ad.id!]?.call_action_count || 0}</p>
+                              </div>
+                              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                <div className="flex items-center gap-2 text-orange-500 mb-1">
+                                  <TrendingUp size={14} />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Clicks</span>
+                                </div>
+                                <p className="text-lg font-black text-slate-900">{adStats[ad.id!]?.click_count || 0}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {view === 'post' && (
+              <motion.div
+                key="post"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-8"
+              >
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => setView('dashboard')} 
+                    className="p-3 hover:bg-slate-100 rounded-2xl transition-all text-slate-400 hover:text-slate-900"
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">Create Campaign</h3>
+                    <p className="text-slate-500 text-sm font-medium">Fill in the details to reach your audience</p>
+                  </div>
+                </div>
+
+                {step === 1 && (
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Type</label>
+                      <div className="grid grid-cols-2 gap-4">
+                        {(['Local', 'Corporate'] as AdType[]).map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => setFormData({ ...formData, adType: type })}
+                            className={`p-5 rounded-2xl border-2 text-sm font-black transition-all flex flex-col items-center gap-2 ${
+                              formData.adType === type
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xl shadow-emerald-100'
+                                : 'bg-white text-slate-600 border-slate-100 hover:border-emerald-200'
+                            }`}
+                          >
+                            {type === 'Local' ? (
+                              <>
+                                <User size={24} />
+                                Individual/Local
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck size={24} />
+                                Branded Company
+                              </>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {formData.adType === 'Corporate' && (
+                      <div className="space-y-3">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Website URL</label>
+                        <input
+                          type="url"
+                          value={formData.websiteUrl}
+                          onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                          placeholder="https://yourbrand.com"
+                          className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Text</label>
+                      <textarea
+                        value={formData.text}
+                        onChange={(e) => setFormData({ ...formData, text: e.target.value })}
+                        placeholder="What are you offering? (e.g. Best Tractor Repair in Sanganer)"
+                        className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold h-32 resize-none"
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Image</label>
+                      <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center hover:border-emerald-500 transition-all bg-slate-50/50 group">
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'image')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        {formData.image ? (
+                          <div className="relative inline-block">
+                            <img src={formData.image} alt="Preview" className="max-h-40 rounded-2xl shadow-lg" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
+                              <p className="text-white text-xs font-black">CHANGE IMAGE</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-slate-400">
+                            <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                              <Upload size={24} />
+                            </div>
+                            <p className="text-sm font-black">Click to upload ad creative</p>
+                            <p className="text-[10px] mt-1 font-bold">JPG, PNG up to 5MB</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Target Area</label>
+                        <select 
+                          value={formData.targetLevel} 
+                          onChange={(e) => setFormData({ ...formData, targetLevel: e.target.value as TargetLevel })} 
+                          className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold appearance-none"
+                        >
+                          <option value="India">All India</option>
+                          <option value="State">State Level</option>
+                          <option value="District">District Level</option>
+                          <option value="Tehsil">Tehsil Level</option>
+                        </select>
+                      </div>
+                      <div className="space-y-3">
+                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Area Name</label>
+                        <input 
+                          type="text" 
+                          value={formData.targetValue} 
+                          onChange={(e) => setFormData({ ...formData, targetValue: e.target.value })} 
+                          placeholder="e.g. Rajasthan" 
+                          className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Select Plan</label>
+                      <div className="grid grid-cols-3 gap-4">
+                        {plans.map((p) => (
+                          <button 
+                            key={p.days} 
+                            onClick={() => setFormData({ ...formData, plan: p.days as AdPlan })} 
+                            className={`p-5 rounded-2xl border-2 text-sm font-black transition-all flex flex-col items-center gap-1 ${
+                              formData.plan === p.days 
+                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xl shadow-emerald-100' 
+                                : 'bg-white text-slate-600 border-slate-100 hover:border-emerald-200'
+                            }`}
+                          >
+                            <span className="text-lg">{p.days}</span>
+                            <span className="text-[10px] uppercase tracking-widest opacity-60">Days</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-emerald-900 p-8 rounded-[2rem] text-white flex justify-between items-center shadow-xl relative overflow-hidden">
+                      <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+                      <div className="relative">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 mb-1">Total Investment</p>
+                        <span className="text-4xl font-black">₹{calculatePrice()}</span>
+                      </div>
+                      <button 
+                        onClick={() => setStep(2)} 
+                        className="relative bg-orange-500 hover:bg-orange-600 text-white font-black px-8 py-4 rounded-2xl transition-all shadow-lg shadow-orange-900/20 transform active:scale-95"
+                      >
+                        NEXT: PAYMENT
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {step === 2 && (
+                  <div className="space-y-8 text-center py-8">
+                    <div className="space-y-4">
+                      <h3 className="text-2xl font-black text-slate-900">Scan to Pay</h3>
+                      <p className="text-slate-500 text-sm font-medium max-w-xs mx-auto">Complete your payment of <span className="text-emerald-600 font-black">₹{calculatePrice()}</span> to activate your campaign.</p>
+                      <div className="bg-white p-6 border-4 border-slate-50 rounded-[2.5rem] inline-block shadow-2xl">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikas123metro01@okaxis&pn=Gram%20Shakti&am=" alt="QR" className="w-56 h-56" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 text-left max-w-md mx-auto">
+                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Upload Payment Screenshot</label>
+                      <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center hover:border-emerald-500 transition-all bg-slate-50/50 group">
+                        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'paymentScreenshot')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                        {formData.paymentScreenshot ? (
+                          <div className="relative inline-block">
+                            <img src={formData.paymentScreenshot} alt="Screenshot" className="max-h-40 rounded-2xl shadow-lg" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
+                              <p className="text-white text-xs font-black">CHANGE SCREENSHOT</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-slate-400">
+                            <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                              <CreditCard size={24} />
+                            </div>
+                            <p className="text-sm font-black">Click to upload payment proof</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4 max-w-md mx-auto pt-4">
+                      <button 
+                        onClick={() => setStep(1)} 
+                        className="flex-1 bg-slate-100 text-slate-600 font-black py-5 rounded-2xl hover:bg-slate-200 transition-all"
+                      >
+                        BACK
+                      </button>
+                      <button 
+                        onClick={handleSubmitAd} 
+                        disabled={isLoading || !formData.paymentScreenshot} 
+                        className="flex-[2] bg-emerald-600 text-white font-black py-5 rounded-2xl hover:bg-emerald-700 disabled:bg-slate-300 transition-all shadow-xl shadow-emerald-100 transform active:scale-95"
+                      >
+                        {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'SUBMIT CAMPAIGN'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {step === 4 && (
+                  <div className="text-center py-20 space-y-6">
+                    <div className="bg-emerald-50 w-24 h-24 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner">
+                      <CheckCircle className="text-emerald-600" size={48} />
+                    </div>
+                    <div className="space-y-2">
+                      <h2 className="text-3xl font-black text-slate-900">Campaign Submitted!</h2>
+                      <p className="text-slate-500 font-medium max-w-xs mx-auto">Our team will review and activate your ad within 24 hours.</p>
+                    </div>
+                    <button 
+                      onClick={() => setView('dashboard')} 
+                      className="bg-emerald-600 text-white font-black py-5 px-12 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 transform active:scale-95"
+                    >
+                      GO TO DASHBOARD
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </motion.div>
