@@ -10,27 +10,9 @@ import {
   getDoc,
 } from 'firebase/firestore';
 
-import {
-  X,
-  Upload,
-  CreditCard,
-  CheckCircle,
-  Plus,
-  Loader2,
-  TrendingUp,
-  PhoneCall,
-  Eye,
-  ChevronLeft,
-  LayoutDashboard,
-  Megaphone,
-  ShieldCheck,
-  User,
-  LogOut,
-} from 'lucide-react';
+import { motion } from 'framer-motion';
 
-import { motion, AnimatePresence } from 'framer-motion';
-
-// ✅ TYPES (Fix missing type errors)
+// ✅ TYPES
 type AdType = 'Local' | 'Corporate';
 type TargetLevel = 'India' | 'State' | 'District' | 'Tehsil';
 type AdPlan = 7 | 15 | 30;
@@ -70,7 +52,7 @@ interface Props {
   onClose: () => void;
 }
 
-// ✅ Plans
+// ✅ PLANS
 const plans = [
   { days: 7, local: 200, state: 500 },
   { days: 15, local: 350, state: 900 },
@@ -78,16 +60,11 @@ const plans = [
 ];
 
 export default function AdDashboard({ isOpen, onClose }: Props) {
-  const [view, setView] = useState<'login' | 'dashboard' | 'post'>(
-    auth.currentUser ? 'dashboard' : 'login'
-  );
-
-  const [user, setUser] = useState<any>(auth.currentUser);
+  const [view, setView] = useState<'login' | 'dashboard' | 'post'>('login');
+  const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [myAds, setMyAds] = useState<ActiveBanner[]>([]);
   const [adStats, setAdStats] = useState<Record<string, AdStats>>({});
-
   const [step, setStep] = useState(1);
 
   const [formData, setFormData] = useState({
@@ -101,19 +78,18 @@ export default function AdDashboard({ isOpen, onClose }: Props) {
     paymentScreenshot: '',
   });
 
-  // ✅ AUTH LISTENER FIX
+  // ✅ AUTH
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((u) => {
       setUser(u);
-      setIsAuthChecking(false);
       setView(u ? 'dashboard' : 'login');
     });
     return () => unsub();
   }, []);
 
-  // ✅ FETCH ADS FIX (no async loop bug)
+  // ✅ FETCH ADS
   useEffect(() => {
-    if (!user || view !== 'dashboard') return;
+    if (!user) return;
 
     const q = query(
       collection(db, 'active_banners'),
@@ -142,7 +118,7 @@ export default function AdDashboard({ isOpen, onClose }: Props) {
     });
 
     return () => unsub();
-  }, [user, view]);
+  }, [user]);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -217,92 +193,81 @@ export default function AdDashboard({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
-      <motion.div
-        initial={{ scale: 0.9 }}
-        animate={{ scale: 1 }}
-        className="bg-white w-full max-w-2xl rounded-2xl p-6"
-      >
-        {/* HEADER */}
-        <div className="flex justify-between mb-4">
-          <h2 className="font-bold">Ad Dashboard</h2>
-          <button onClick={onClose}>
-            <X />
+    <div style={{ padding: 20 }}>
+      <h2>Ad Dashboard</h2>
+
+      {/* LOGIN */}
+      {view === 'login' && (
+        <button onClick={handleGoogleLogin}>
+          {isLoading ? 'Loading...' : 'Login with Google'}
+        </button>
+      )}
+
+      {/* DASHBOARD */}
+      {view === 'dashboard' && (
+        <>
+          <button onClick={() => setView('post')}>
+            ➕ New Ad
           </button>
-        </div>
 
-        {/* LOGIN */}
-        {view === 'login' && (
-          <button
-            onClick={handleGoogleLogin}
-            className="bg-black text-white px-6 py-3 rounded"
-          >
-            {isLoading ? 'Loading...' : 'Login with Google'}
+          <button onClick={handleLogout}>
+            Logout
           </button>
-        )}
 
-        {/* DASHBOARD */}
-        {view === 'dashboard' && (
-          <>
-            <button onClick={() => setView('post')}>
-              ➕ New Ad
-            </button>
+          {myAds.map((ad) => (
+            <div key={ad.id}>
+              <p>{ad.text}</p>
+              <p>Views: {adStats[ad.id!]?.views_count || 0}</p>
+            </div>
+          ))}
+        </>
+      )}
 
-            {myAds.map((ad) => (
-              <div key={ad.id} className="border p-3 mt-3">
-                <p>{ad.text}</p>
-                <p>Views: {adStats[ad.id!]?.views_count || 0}</p>
-              </div>
-            ))}
-          </>
-        )}
+      {/* POST */}
+      {view === 'post' && (
+        <>
+          {step === 1 && (
+            <>
+              <input
+                placeholder="Ad Text"
+                value={formData.text}
+                onChange={(e) =>
+                  setFormData({ ...formData, text: e.target.value })
+                }
+              />
 
-        {/* POST */}
-        {view === 'post' && (
-          <>
-            {step === 1 && (
-              <>
-                <input
-                  placeholder="Ad Text"
-                  value={formData.text}
-                  onChange={(e) =>
-                    setFormData({ ...formData, text: e.target.value })
-                  }
-                />
+              <input
+                type="file"
+                onChange={(e) => handleFileChange(e, 'image')}
+              />
 
-                <input
-                  type="file"
-                  onChange={(e) => handleFileChange(e, 'image')}
-                />
+              <button onClick={() => setStep(2)}>
+                Next ₹{calculatePrice()}
+              </button>
+            </>
+          )}
 
-                <button onClick={() => setStep(2)}>
-                  Next ₹{calculatePrice()}
-                </button>
-              </>
-            )}
+          {step === 2 && (
+            <>
+              <input
+                type="file"
+                onChange={(e) =>
+                  handleFileChange(e, 'paymentScreenshot')
+                }
+              />
 
-            {step === 2 && (
-              <>
-                <input
-                  type="file"
-                  onChange={(e) =>
-                    handleFileChange(e, 'paymentScreenshot')
-                  }
-                />
+              <button
+                onClick={handleSubmitAd}
+                disabled={!formData.paymentScreenshot}
+              >
+                Submit
+              </button>
+            </>
+          )}
 
-                <button
-                  onClick={handleSubmitAd}
-                  disabled={!formData.paymentScreenshot}
-                >
-                  Submit
-                </button>
-              </>
-            )}
-
-            {step === 4 && <p>✅ Submitted</p>}
-          </>
-        )}
-      </motion.div>
+          {step === 4 && <p>✅ Submitted</p>}
+        </>
+      )}
     </div>
   );
 }
