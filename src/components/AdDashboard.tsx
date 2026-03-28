@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { auth, db, RecaptchaVerifier, signInWithPhoneNumber } from '../firebase';
+import { auth, db } from '../firebase'; // Recaptcha aur signInWithPhoneNumber हटा दिया
 import { collection, query, where, addDoc, onSnapshot, doc, getDoc } from 'firebase/firestore';
+// Google Auth के लिए imports
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { TargetLevel, AdPlan, PendingAd, AdType, ActiveBanner, AdStats } from '../types';
 import { X, Upload, CreditCard, CheckCircle, Plus, Phone, ArrowRight, Loader2, TrendingUp, PhoneCall, Eye, ChevronLeft, LayoutDashboard, Megaphone, ShieldCheck, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -19,9 +21,6 @@ const plans = [
 export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
   const [view, setView] = useState<'login' | 'dashboard' | 'post'>('login');
   const [user, setUser] = useState(auth.currentUser);
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [myAds, setMyAds] = useState<ActiveBanner[]>([]);
   const [adStats, setAdStats] = useState<Record<string, AdStats>>({});
@@ -55,7 +54,6 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
         const ads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActiveBanner));
         setMyAds(ads);
         
-        // Fetch stats for each ad
         ads.forEach(async (ad) => {
           if (!ad.id) return;
           const statsDoc = await getDoc(doc(db, 'ad_stats', ad.id));
@@ -68,32 +66,19 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
     }
   }, [user, view]);
 
-  const handleSendCode = async () => {
-    if (!phoneNumber) return;
+  // --- GOOGLE LOGIN SYSTEM ---
+  const handleGoogleLogin = async () => {
     setIsLoading(true);
+    const provider = new GoogleAuthProvider();
     try {
-      const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible'
-      });
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier);
-      setConfirmationResult(confirmation);
-      setStep(2);
+      const result = await signInWithPopup(auth, provider);
+      if (result.user) {
+        setUser(result.user);
+        setView('dashboard');
+      }
     } catch (error) {
-      console.error('SMS Error:', error);
-      alert('Failed to send SMS. / एसएमएस भेजने में विफल।');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    if (!verificationCode || !confirmationResult) return;
-    setIsLoading(true);
-    try {
-      await confirmationResult.confirm(verificationCode);
-    } catch (error) {
-      console.error('Verify Error:', error);
-      alert('Invalid code. / अमान्य कोड।');
+      console.error('Google Login Error:', error);
+      alert('Login failed. / लॉगिन विफल रहा।');
     } finally {
       setIsLoading(false);
     }
@@ -165,10 +150,7 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
               <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest">Manage Your Campaigns</p>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
-            className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all"
-          >
+          <button onClick={onClose} className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all">
             <X size={24} />
           </button>
         </div>
@@ -181,91 +163,41 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="max-w-sm mx-auto space-y-8 py-12"
+                className="max-w-sm mx-auto space-y-8 py-12 text-center"
               >
-                <div className="text-center space-y-4">
+                <div className="space-y-4">
                   <div className="bg-emerald-50 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-4 shadow-inner">
-                    <Phone className="text-emerald-600" size={32} />
+                    <User className="text-emerald-600" size={40} />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-900">Login with Phone</h3>
-                  <p className="text-slate-500 text-sm font-medium">Enter your mobile number to access your ad dashboard.</p>
+                  <h3 className="text-2xl font-black text-slate-900">Login with Gmail</h3>
+                  <p className="text-slate-500 text-sm font-medium">Use your Google account to access the portal.</p>
                 </div>
 
-                {step === 1 ? (
-                  <div className="space-y-6">
-                    <div className="relative group">
-                      <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg">+91</span>
-                      <input
-                        type="tel"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        placeholder="Mobile Number"
-                        className="w-full pl-16 pr-6 py-5 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none font-black text-lg tracking-wider transition-all"
-                      />
-                    </div>
-                    <div id="recaptcha-container"></div>
-                    <button
-                      onClick={handleSendCode}
-                      disabled={isLoading || phoneNumber.length < 10}
-                      className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl hover:bg-emerald-700 disabled:bg-slate-300 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-200 transform active:scale-95"
-                    >
-                      {isLoading ? <Loader2 className="animate-spin" /> : (
-                        <>
-                          SEND OTP / ओटीपी भेजें
-                          <ArrowRight size={20} />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value)}
-                        placeholder="000000"
-                        className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-center font-black text-3xl tracking-[0.5em] transition-all"
-                        maxLength={6}
-                      />
-                      <p className="text-center text-xs text-slate-400 font-bold">Enter the 6-digit code sent to your phone</p>
-                    </div>
-                    <button
-                      onClick={handleVerifyCode}
-                      disabled={isLoading || verificationCode.length < 6}
-                      className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl hover:bg-emerald-700 disabled:bg-slate-300 transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-200 transform active:scale-95"
-                    >
-                      {isLoading ? <Loader2 className="animate-spin" /> : 'VERIFY & LOGIN / सत्यापित करें'}
-                    </button>
-                    <button 
-                      onClick={() => setStep(1)} 
-                      className="w-full text-slate-400 text-sm font-black hover:text-emerald-600 transition-colors"
-                    >
-                      RESEND OTP / दोबारा भेजें
-                    </button>
-                  </div>
-                )}
+                <button
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-4 bg-white border-2 border-slate-100 py-5 rounded-2xl hover:bg-slate-50 transition-all shadow-xl shadow-slate-200/50 transform active:scale-95 group"
+                >
+                  {isLoading ? <Loader2 className="animate-spin text-emerald-600" /> : (
+                    <>
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" className="w-6 h-6" />
+                      <span className="font-black text-slate-700 text-lg">Continue with Google</span>
+                    </>
+                  )}
+                </button>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Fast & Secure Login</p>
               </motion.div>
             )}
 
             {view === 'dashboard' && (
-              <motion.div
-                key="dashboard"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="space-y-8"
-              >
+              <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
                 <div className="flex justify-between items-center">
                   <div>
                     <h3 className="text-2xl font-black text-slate-900">My Campaigns</h3>
-                    <p className="text-slate-500 text-sm font-medium">Track your ad performance in real-time</p>
+                    <p className="text-slate-500 text-sm font-medium">Real-time performance tracking</p>
                   </div>
-                  <button
-                    onClick={() => { setView('post'); setStep(1); }}
-                    className="bg-orange-500 text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 transform active:scale-95"
-                  >
-                    <Plus size={20} />
-                    POST NEW AD
+                  <button onClick={() => { setView('post'); setStep(1); }} className="bg-orange-500 text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-orange-600 transition-all shadow-lg transform active:scale-95">
+                    <Plus size={20} /> POST NEW AD
                   </button>
                 </div>
 
@@ -274,48 +206,28 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
                     <div className="text-center py-20 bg-slate-50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
                       <Megaphone className="mx-auto text-slate-300 mb-4" size={48} />
                       <p className="text-slate-400 font-black text-lg">No active ads found.</p>
-                      <p className="text-slate-400 text-sm mt-1">Start your first campaign today!</p>
                     </div>
                   ) : (
                     myAds.map((ad) => (
-                      <div key={ad.id} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all group">
+                      <div key={ad.id} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all">
                         <div className="flex flex-col sm:flex-row gap-6">
-                          <div className="w-full sm:w-24 h-24 bg-slate-50 rounded-2xl overflow-hidden flex-shrink-0 border border-slate-100">
-                            {ad.image && <img src={ad.image} alt="Ad" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />}
+                          <div className="w-full sm:w-24 h-24 bg-slate-50 rounded-2xl overflow-hidden flex-shrink-0">
+                            {ad.image && <img src={ad.image} alt="Ad" className="w-full h-full object-cover" />}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-wider ${ad.adType === 'Corporate' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                  {ad.adType}
-                                </span>
-                                {ad.adType === 'Corporate' && <ShieldCheck size={14} className="text-blue-500" />}
-                              </div>
-                              <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{new Date(ad.createdAt).toLocaleDateString()}</span>
-                            </div>
                             <h4 className="text-lg font-black text-slate-800 mb-4 line-clamp-1">{ad.text}</h4>
-                            
                             <div className="grid grid-cols-3 gap-4">
-                              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                                <div className="flex items-center gap-2 text-blue-500 mb-1">
-                                  <Eye size={14} />
-                                  <span className="text-[10px] font-black uppercase tracking-widest">Views</span>
-                                </div>
-                                <p className="text-lg font-black text-slate-900">{adStats[ad.id!]?.views_count || 0}</p>
+                              <div className="bg-slate-50 p-3 rounded-2xl text-center">
+                                <Eye size={14} className="mx-auto text-blue-500 mb-1" />
+                                <p className="text-lg font-black">{adStats[ad.id!]?.views_count || 0}</p>
                               </div>
-                              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                                <div className="flex items-center gap-2 text-emerald-500 mb-1">
-                                  <PhoneCall size={14} />
-                                  <span className="text-[10px] font-black uppercase tracking-widest">Calls</span>
-                                </div>
-                                <p className="text-lg font-black text-slate-900">{adStats[ad.id!]?.call_action_count || 0}</p>
+                              <div className="bg-slate-50 p-3 rounded-2xl text-center">
+                                <PhoneCall size={14} className="mx-auto text-emerald-500 mb-1" />
+                                <p className="text-lg font-black">{adStats[ad.id!]?.call_action_count || 0}</p>
                               </div>
-                              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                                <div className="flex items-center gap-2 text-orange-500 mb-1">
-                                  <TrendingUp size={14} />
-                                  <span className="text-[10px] font-black uppercase tracking-widest">Clicks</span>
-                                </div>
-                                <p className="text-lg font-black text-slate-900">{adStats[ad.id!]?.click_count || 0}</p>
+                              <div className="bg-slate-50 p-3 rounded-2xl text-center">
+                                <TrendingUp size={14} className="mx-auto text-orange-500 mb-1" />
+                                <p className="text-lg font-black">{adStats[ad.id!]?.click_count || 0}</p>
                               </div>
                             </div>
                           </div>
@@ -328,229 +240,59 @@ export default function AdDashboard({ isOpen, onClose }: AdDashboardProps) {
             )}
 
             {view === 'post' && (
-              <motion.div
-                key="post"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="space-y-8"
-              >
+              <motion.div key="post" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
                 <div className="flex items-center gap-4">
-                  <button 
-                    onClick={() => setView('dashboard')} 
-                    className="p-3 hover:bg-slate-100 rounded-2xl transition-all text-slate-400 hover:text-slate-900"
-                  >
-                    <ChevronLeft size={24} />
-                  </button>
-                  <div>
-                    <h3 className="text-2xl font-black text-slate-900">Create Campaign</h3>
-                    <p className="text-slate-500 text-sm font-medium">Fill in the details to reach your audience</p>
-                  </div>
+                  <button onClick={() => setView('dashboard')} className="p-3 hover:bg-slate-100 rounded-2xl transition-all text-slate-400 hover:text-slate-900"><ChevronLeft size={24} /></button>
+                  <h3 className="text-2xl font-black text-slate-900">Create Campaign</h3>
                 </div>
 
                 {step === 1 && (
                   <div className="space-y-6">
-                    <div className="space-y-3">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Type</label>
-                      <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                         {(['Local', 'Corporate'] as AdType[]).map((type) => (
-                          <button
-                            key={type}
-                            onClick={() => setFormData({ ...formData, adType: type })}
-                            className={`p-5 rounded-2xl border-2 text-sm font-black transition-all flex flex-col items-center gap-2 ${
-                              formData.adType === type
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xl shadow-emerald-100'
-                                : 'bg-white text-slate-600 border-slate-100 hover:border-emerald-200'
-                            }`}
-                          >
-                            {type === 'Local' ? (
-                              <>
-                                <User size={24} />
-                                Individual/Local
-                              </>
-                            ) : (
-                              <>
-                                <ShieldCheck size={24} />
-                                Branded Company
-                              </>
-                            )}
+                          <button key={type} onClick={() => setFormData({ ...formData, adType: type })} className={`p-5 rounded-2xl border-2 text-sm font-black transition-all flex flex-col items-center gap-2 ${formData.adType === type ? 'bg-emerald-600 text-white border-emerald-600 shadow-xl' : 'bg-white text-slate-600 border-slate-100 hover:border-emerald-200'}`}>
+                            {type === 'Local' ? <User size={24} /> : <ShieldCheck size={24} />}
+                            {type}
                           </button>
                         ))}
-                      </div>
                     </div>
 
-                    {formData.adType === 'Corporate' && (
-                      <div className="space-y-3">
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Website URL</label>
-                        <input
-                          type="url"
-                          value={formData.websiteUrl}
-                          onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
-                          placeholder="https://yourbrand.com"
-                          className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold"
-                        />
-                      </div>
-                    )}
-
-                    <div className="space-y-3">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Text</label>
-                      <textarea
-                        value={formData.text}
-                        onChange={(e) => setFormData({ ...formData, text: e.target.value })}
-                        placeholder="What are you offering? (e.g. Best Tractor Repair in Sanganer)"
-                        className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold h-32 resize-none"
-                      />
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Ad Image</label>
-                      <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center hover:border-emerald-500 transition-all bg-slate-50/50 group">
+                    <textarea value={formData.text} onChange={(e) => setFormData({ ...formData, text: e.target.value })} placeholder="Ad Text..." className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none h-32 font-bold" />
+                    
+                    <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center bg-slate-50/50 group">
                         <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'image')} className="absolute inset-0 opacity-0 cursor-pointer" />
-                        {formData.image ? (
-                          <div className="relative inline-block">
-                            <img src={formData.image} alt="Preview" className="max-h-40 rounded-2xl shadow-lg" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
-                              <p className="text-white text-xs font-black">CHANGE IMAGE</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-slate-400">
-                            <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-                              <Upload size={24} />
-                            </div>
-                            <p className="text-sm font-black">Click to upload ad creative</p>
-                            <p className="text-[10px] mt-1 font-bold">JPG, PNG up to 5MB</p>
-                          </div>
-                        )}
-                      </div>
+                        {formData.image ? <img src={formData.image} className="max-h-40 mx-auto rounded-2xl" /> : <div className="text-slate-400"><Upload className="mx-auto mb-2" /> <p className="text-sm font-black">Upload Ad Image</p></div>}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Target Area</label>
-                        <select 
-                          value={formData.targetLevel} 
-                          onChange={(e) => setFormData({ ...formData, targetLevel: e.target.value as TargetLevel })} 
-                          className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold appearance-none"
-                        >
-                          <option value="India">All India</option>
-                          <option value="State">State Level</option>
-                          <option value="District">District Level</option>
-                          <option value="Tehsil">Tehsil Level</option>
-                        </select>
-                      </div>
-                      <div className="space-y-3">
-                        <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Area Name</label>
-                        <input 
-                          type="text" 
-                          value={formData.targetValue} 
-                          onChange={(e) => setFormData({ ...formData, targetValue: e.target.value })} 
-                          placeholder="e.g. Rajasthan" 
-                          className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-emerald-500 transition-all font-bold" 
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Select Plan</label>
-                      <div className="grid grid-cols-3 gap-4">
-                        {plans.map((p) => (
-                          <button 
-                            key={p.days} 
-                            onClick={() => setFormData({ ...formData, plan: p.days as AdPlan })} 
-                            className={`p-5 rounded-2xl border-2 text-sm font-black transition-all flex flex-col items-center gap-1 ${
-                              formData.plan === p.days 
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xl shadow-emerald-100' 
-                                : 'bg-white text-slate-600 border-slate-100 hover:border-emerald-200'
-                            }`}
-                          >
-                            <span className="text-lg">{p.days}</span>
-                            <span className="text-[10px] uppercase tracking-widest opacity-60">Days</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="bg-emerald-900 p-8 rounded-[2rem] text-white flex justify-between items-center shadow-xl relative overflow-hidden">
-                      <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-                      <div className="relative">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300 mb-1">Total Investment</p>
-                        <span className="text-4xl font-black">₹{calculatePrice()}</span>
-                      </div>
-                      <button 
-                        onClick={() => setStep(2)} 
-                        className="relative bg-orange-500 hover:bg-orange-600 text-white font-black px-8 py-4 rounded-2xl transition-all shadow-lg shadow-orange-900/20 transform active:scale-95"
-                      >
-                        NEXT: PAYMENT
-                      </button>
+                    <div className="bg-emerald-900 p-8 rounded-[2rem] text-white flex justify-between items-center shadow-xl">
+                      <div><p className="text-[10px] font-black uppercase text-emerald-300">Total Price</p><span className="text-4xl font-black">₹{calculatePrice()}</span></div>
+                      <button onClick={() => setStep(2)} className="bg-orange-500 text-white font-black px-8 py-4 rounded-2xl shadow-lg">NEXT</button>
                     </div>
                   </div>
                 )}
 
                 {step === 2 && (
                   <div className="space-y-8 text-center py-8">
-                    <div className="space-y-4">
-                      <h3 className="text-2xl font-black text-slate-900">Scan to Pay</h3>
-                      <p className="text-slate-500 text-sm font-medium max-w-xs mx-auto">Complete your payment of <span className="text-emerald-600 font-black">₹{calculatePrice()}</span> to activate your campaign.</p>
-                      <div className="bg-white p-6 border-4 border-slate-50 rounded-[2.5rem] inline-block shadow-2xl">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikas123metro01@okaxis&pn=Gram%20Shakti&am=" alt="QR" className="w-56 h-56" />
-                      </div>
+                    <h3 className="text-2xl font-black">Scan to Pay</h3>
+                    <div className="bg-white p-6 border-4 border-slate-50 rounded-[2.5rem] inline-block shadow-2xl">
+                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=vikas123metro01@okaxis&pn=Gram%20Shakti&am=${calculatePrice()}`} alt="QR" className="w-56 h-56" />
                     </div>
-
-                    <div className="space-y-4 text-left max-w-md mx-auto">
-                      <label className="block text-xs font-black text-slate-400 uppercase tracking-widest">Upload Payment Screenshot</label>
-                      <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-8 text-center hover:border-emerald-500 transition-all bg-slate-50/50 group">
+                    <div className="relative border-2 border-dashed border-slate-200 rounded-[2rem] p-8 bg-slate-50/50">
                         <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'paymentScreenshot')} className="absolute inset-0 opacity-0 cursor-pointer" />
-                        {formData.paymentScreenshot ? (
-                          <div className="relative inline-block">
-                            <img src={formData.paymentScreenshot} alt="Screenshot" className="max-h-40 rounded-2xl shadow-lg" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center">
-                              <p className="text-white text-xs font-black">CHANGE SCREENSHOT</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-slate-400">
-                            <div className="bg-white w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
-                              <CreditCard size={24} />
-                            </div>
-                            <p className="text-sm font-black">Click to upload payment proof</p>
-                          </div>
-                        )}
-                      </div>
+                        {formData.paymentScreenshot ? <img src={formData.paymentScreenshot} className="max-h-40 mx-auto rounded-2xl" /> : <div className="text-slate-400"><CreditCard className="mx-auto mb-2" /> <p className="text-sm font-black">Upload Payment Screenshot</p></div>}
                     </div>
-
-                    <div className="flex gap-4 max-w-md mx-auto pt-4">
-                      <button 
-                        onClick={() => setStep(1)} 
-                        className="flex-1 bg-slate-100 text-slate-600 font-black py-5 rounded-2xl hover:bg-slate-200 transition-all"
-                      >
-                        BACK
-                      </button>
-                      <button 
-                        onClick={handleSubmitAd} 
-                        disabled={isLoading || !formData.paymentScreenshot} 
-                        className="flex-[2] bg-emerald-600 text-white font-black py-5 rounded-2xl hover:bg-emerald-700 disabled:bg-slate-300 transition-all shadow-xl shadow-emerald-100 transform active:scale-95"
-                      >
-                        {isLoading ? <Loader2 className="animate-spin mx-auto" /> : 'SUBMIT CAMPAIGN'}
-                      </button>
+                    <div className="flex gap-4 max-w-md mx-auto">
+                      <button onClick={() => setStep(1)} className="flex-1 bg-slate-100 py-5 rounded-2xl font-black">BACK</button>
+                      <button onClick={handleSubmitAd} disabled={isLoading || !formData.paymentScreenshot} className="flex-[2] bg-emerald-600 text-white py-5 rounded-2xl font-black shadow-xl">SUBMIT</button>
                     </div>
                   </div>
                 )}
 
                 {step === 4 && (
                   <div className="text-center py-20 space-y-6">
-                    <div className="bg-emerald-50 w-24 h-24 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner">
-                      <CheckCircle className="text-emerald-600" size={48} />
-                    </div>
-                    <div className="space-y-2">
-                      <h2 className="text-3xl font-black text-slate-900">Campaign Submitted!</h2>
-                      <p className="text-slate-500 font-medium max-w-xs mx-auto">Our team will review and activate your ad within 24 hours.</p>
-                    </div>
-                    <button 
-                      onClick={() => setView('dashboard')} 
-                      className="bg-emerald-600 text-white font-black py-5 px-12 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 transform active:scale-95"
-                    >
-                      GO TO DASHBOARD
-                    </button>
+                    <CheckCircle className="text-emerald-600 mx-auto" size={64} />
+                    <h2 className="text-3xl font-black">Submitted!</h2>
+                    <button onClick={() => setView('dashboard')} className="bg-emerald-600 text-white py-5 px-12 rounded-2xl font-black shadow-xl">DASHBOARD</button>
                   </div>
                 )}
               </motion.div>
