@@ -4,7 +4,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { Category } from '../types';
 import { CATEGORIES, MAIN_CATEGORIES } from '../constants';
 import { MapPin, Phone, User, Home, CheckCircle, LogIn, ChevronDown, Wrench, Tractor, Truck, Store, PartyPopper, Monitor, HeartPulse, GraduationCap, HardHat, PawPrint, Droplets, Key, Coffee, Briefcase } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const iconMap: Record<string, any> = {
   Wrench, Tractor, Truck, Store, PartyPopper, Monitor, User, HeartPulse, GraduationCap, HardHat, PawPrint, Droplets, Key, Coffee, Briefcase
@@ -15,9 +15,9 @@ export default function WorkerRegistration() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isSkillsOpen, setIsSkillsOpen] = useState(false); // ✅ एक्स्ट्रा स्टेट स्किल्स के लिए
+  const [isSkillsOpen, setIsSkillsOpen] = useState(false); 
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const skillsRef = useRef<HTMLDivElement>(null); // ✅ स्किल्स रेफरेंस
+  const skillsRef = useRef<HTMLDivElement>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -40,7 +40,6 @@ export default function WorkerRegistration() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
-      // ✅ स्किल्स ड्रॉपडाउन को बाहर क्लिक करने पर बंद करने के लिए
       if (skillsRef.current && !skillsRef.current.contains(event.target as Node)) {
         setIsSkillsOpen(false);
       }
@@ -111,7 +110,6 @@ export default function WorkerRegistration() {
     cat => formData.category.includes(cat.hindi) || formData.category.includes(cat.english)
   );
 
-  // ✅ फ़िल्टर स्किल्स लॉजिक - कुछ भी कम नहीं किया
   const filteredSkills = selectedMainCat 
     ? CATEGORIES.filter(skill => skill.mainCategoryId === selectedMainCat.id)
     : [];
@@ -227,7 +225,6 @@ export default function WorkerRegistration() {
                 />
               </div>
               
-              {/* Custom Category Dropdown */}
               <div className="space-y-2 relative" ref={dropdownRef}>
                 <label className="block text-sm font-semibold text-slate-700">Category / श्रेणी</label>
                 <button
@@ -258,7 +255,7 @@ export default function WorkerRegistration() {
                             setFormData({ 
                               ...formData, 
                               category: `${cat.hindi} (${cat.english})` as Category,
-                              skills: '' // Clear skills when category changes
+                              skills: '' 
                             });
                             setIsDropdownOpen(false);
                           }}
@@ -278,7 +275,6 @@ export default function WorkerRegistration() {
                 )}
               </div>
 
-              {/* ✅ Skills/Sub-category Dropdown - यही हिस्सा बदला है */}
               <div className="space-y-2 relative" ref={skillsRef}>
                 <label className="block text-sm font-semibold text-slate-700">Skills / Services (हुनर / सेवाएं)</label>
                 <button
