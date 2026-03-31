@@ -89,7 +89,7 @@ const fetchWorks = async () => {
 };
 
 
-// ✅ CATEGORY FILTER
+// ✅ CATEGORY FILTER (Updated Logic)
 useEffect(() => {
   if (!filters.category) {
     setFilteredWorks([]);
@@ -221,7 +221,9 @@ return (
 {activeTab === 'register' && (
   <WorkerRegistration 
     categories={categories}
-    works={filteredWorks}
+    works={works} // बदला हुआ हिस्सा: यहाँ 'works' भेजा गया है ताकि रजिस्ट्रेशन पेज खुद फ़िल्टर कर सके
+    setFilters={setFilters} // यह फिल्टर को अपडेट करने के लिए जरूरी है
+    filters={filters} // मौजूदा फिल्टर भेजने के लिए
   />
 )}
 
