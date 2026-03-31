@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { auth, db, signInWithGoogle } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { Category } from '../types';
@@ -24,19 +24,15 @@ export default function WorkerRegistration() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
-  // Safe initialization
-  const initialCategory = MAIN_CATEGORIES.length > 0 
-    ? `${MAIN_CATEGORIES[0].hindi} (${MAIN_CATEGORIES[0].english})` 
-    : '';
-
   const [formData, setFormData] = useState({
     name: '',
     mobile: '',
     pincode: '',
     village: '',
-    category: initialCategory as Category,
+    category: (MAIN_CATEGORIES.length > 0 
+      ? `${MAIN_CATEGORIES[0].hindi} (${MAIN_CATEGORIES[0].english})` 
+      : '') as Category,
     subCategory: '',
-    skills: '',
     location: null as { lat: number; lng: number } | null,
   });
 
@@ -48,6 +44,7 @@ export default function WorkerRegistration() {
     return () => unsubscribe();
   }, []);
 
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -106,26 +103,35 @@ export default function WorkerRegistration() {
       });
       setIsSuccess(true);
     } catch (error: any) {
-      console.error('Registration Error:', error);
+      console.error('Firestore Error:', error);
       alert('Failed to register. Please try again. / पंजीकरण विफल रहा। कृपया पुनः प्रयास करें।');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const selectedMainCat = MAIN_CATEGORIES.find(
-    cat => formData.category.includes(cat.hindi) || formData.category.includes(cat.english)
-  );
+  const selectedMainCat = useMemo(() => {
+    return MAIN_CATEGORIES.find(
+      cat => `${cat.hindi} (${cat.english})` === formData.category
+    );
+  }, [formData.category]);
 
+  // Update sub-category when main category changes
   useEffect(() => {
     if (selectedMainCat && selectedMainCat.subCategories.length > 0) {
-      const firstSub = selectedMainCat.subCategories[0];
-      setFormData(prev => ({ 
-        ...prev, 
-        subCategory: `${firstSub.hindi} (${firstSub.english})` 
-      }));
+      const currentSubBelongs = selectedMainCat.subCategories.some(
+        sub => `${sub.hindi} (${sub.english})` === formData.subCategory
+      );
+      
+      if (!currentSubBelongs) {
+        const firstSub = selectedMainCat.subCategories[0];
+        setFormData(prev => ({ 
+          ...prev, 
+          subCategory: `${firstSub.hindi} (${firstSub.english})` 
+        }));
+      }
     }
-  }, [formData.category, selectedMainCat]);
+  }, [selectedMainCat, formData.subCategory]);
 
   const SelectedIcon = selectedMainCat ? (iconMap[selectedMainCat.icon] || Wrench) : Wrench;
 
@@ -197,7 +203,7 @@ export default function WorkerRegistration() {
                   type="text"
                   placeholder="Enter your name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>
@@ -211,7 +217,7 @@ export default function WorkerRegistration() {
                   pattern="[0-9]{10}"
                   placeholder="10-digit number"
                   value={formData.mobile}
-                  onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mobile: e.target.value }))}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>
@@ -224,7 +230,7 @@ export default function WorkerRegistration() {
                   type="text"
                   placeholder="6-digit pincode"
                   value={formData.pincode}
-                  onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, pincode: e.target.value }))}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>
@@ -237,7 +243,7 @@ export default function WorkerRegistration() {
                   type="text"
                   placeholder="Enter village name"
                   value={formData.village}
-                  onChange={(e) => setFormData({ ...formData, village: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, village: e.target.value }))}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
                 />
               </div>
@@ -270,7 +276,7 @@ export default function WorkerRegistration() {
                           key={cat.id}
                           type="button"
                           onClick={() => {
-                            setFormData({ ...formData, category: `${cat.hindi} (${cat.english})` as Category });
+                            setFormData(prev => ({ ...prev, category: `${cat.hindi} (${cat.english})` as Category }));
                             setIsDropdownOpen(false);
                           }}
                           className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-emerald-50 transition-colors text-left group"
@@ -310,7 +316,7 @@ export default function WorkerRegistration() {
                         key={idx}
                         type="button"
                         onClick={() => {
-                          setFormData({ ...formData, subCategory: `${sub.hindi} (${sub.english})` });
+                          setFormData(prev => ({ ...prev, subCategory: `${sub.hindi} (${sub.english})` }));
                           setIsSubDropdownOpen(false);
                         }}
                         className="w-full px-4 py-2.5 hover:bg-emerald-50 transition-colors text-left"
@@ -321,18 +327,6 @@ export default function WorkerRegistration() {
                     ))}
                   </div>
                 )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-slate-700">Skills / Services (हुनर / सेवाएं)</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. Electrician, Grocery, Plumber"
-                  value={formData.skills}
-                  onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
               </div>
             </div>
 
