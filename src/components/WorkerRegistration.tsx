@@ -34,7 +34,6 @@ export default function WorkerRegistration() {
     return () => unsubscribe();
   }, []);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -106,10 +105,15 @@ export default function WorkerRegistration() {
     }
   };
 
+  // ✅ 1. सबसे पहले चुनी हुई कैटेगरी का डेटा निकालें (Hindi/English किसी से भी मैच करके)
   const selectedMainCat = MAIN_CATEGORIES.find(
-    cat => formData.category.includes(cat.hindi) || formData.category.includes(cat.english)
+    cat => {
+      const combinedName = `${cat.hindi} (${cat.english})`;
+      return formData.category === combinedName;
+    }
   );
 
+  // ✅ 2. अब CATEGORIES में से वो स्किल्स निकालें जिनकी mainCategoryId मैच हो
   const filteredSkills = selectedMainCat 
     ? CATEGORIES.filter(skill => skill.mainCategoryId === selectedMainCat.id)
     : [];
@@ -225,6 +229,7 @@ export default function WorkerRegistration() {
                 />
               </div>
               
+              {/* Custom Category Dropdown */}
               <div className="space-y-2 relative" ref={dropdownRef}>
                 <label className="block text-sm font-semibold text-slate-700">Category / श्रेणी</label>
                 <button
@@ -237,7 +242,7 @@ export default function WorkerRegistration() {
                       <SelectedIcon size={18} />
                     </div>
                     <span className="text-sm font-bold text-slate-700">
-                      {selectedMainCat ? `${selectedMainCat.hindi} (${selectedMainCat.english})` : 'Select Category'}
+                      {formData.category || 'Select Category'}
                     </span>
                   </div>
                   <ChevronDown size={18} className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
@@ -275,6 +280,7 @@ export default function WorkerRegistration() {
                 )}
               </div>
 
+              {/* Skills/Sub-category Dropdown */}
               <div className="space-y-2 relative" ref={skillsRef}>
                 <label className="block text-sm font-semibold text-slate-700">Skills / Services (हुनर / सेवाएं)</label>
                 <button
