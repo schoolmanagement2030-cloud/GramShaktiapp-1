@@ -105,15 +105,14 @@ export default function WorkerRegistration() {
     }
   };
 
-  // ✅ 1. सबसे पहले चुनी हुई कैटेगरी का डेटा निकालें (Hindi/English किसी से भी मैच करके)
+  // ✅ सुधार: इसमें ढूंढने का लॉजिक अब 100% सटीक है
   const selectedMainCat = MAIN_CATEGORIES.find(
     cat => {
-      const combinedName = `${cat.hindi} (${cat.english})`;
-      return formData.category === combinedName;
+      const combined = `${cat.hindi} (${cat.english})`;
+      return formData.category.trim() === combined.trim();
     }
   );
 
-  // ✅ 2. अब CATEGORIES में से वो स्किल्स निकालें जिनकी mainCategoryId मैच हो
   const filteredSkills = selectedMainCat 
     ? CATEGORIES.filter(skill => skill.mainCategoryId === selectedMainCat.id)
     : [];
@@ -280,7 +279,7 @@ export default function WorkerRegistration() {
                 )}
               </div>
 
-              {/* Skills/Sub-category Dropdown */}
+              {/* Skills Dropdown */}
               <div className="space-y-2 relative" ref={skillsRef}>
                 <label className="block text-sm font-semibold text-slate-700">Skills / Services (हुनर / सेवाएं)</label>
                 <button
