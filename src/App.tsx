@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth } from './firebase';
-import { collection, query, getDocs, onSnapshot, limit, doc, updateDoc, increment, setDoc, getDoc } from 'firebase/firestore';
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { WorkerProfile, SearchFilters, ActiveBanner, AdStats } from './types';
+import { collection, getDocs } from 'firebase/firestore';
+import { onAuthStateChanged, User, signInWithRedirect, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { WorkerProfile, SearchFilters, ActiveBanner } from './types';
 import { getDistance } from './lib/utils';
 import Map from './components/Map';
 import SearchForm from './components/SearchForm';
@@ -10,86 +10,96 @@ import WorkerRegistration from './components/WorkerRegistration';
 import AdDashboard from './components/AdDashboard';
 import AdminPanel from './components/AdminPanel';
 import PrivacyPolicy from './components/PrivacyPolicy';
-import { Search, UserPlus, Info, ShieldCheck, Tractor, Store, ChevronRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { Tractor } from 'lucide-react';
 
 export default function App() {
 
 const [user, setUser] = useState<User | null>(null);
 const [activeTab, setActiveTab] = useState<'search' | 'register' | 'privacy'>('search');
+
 const [workers, setWorkers] = useState<WorkerProfile[]>([]);
 const [filteredWorkers, setFilteredWorkers] = useState<WorkerProfile[]>([]);
+
+const [categories, setCategories] = useState<any[]>([]);
+const [works, setWorks] = useState<any[]>([]);
+
 const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
 const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]);
+
 const [filters, setFilters] = useState<SearchFilters>({ category: '', keyword: '' });
 const [isLoading, setIsLoading] = useState(false);
 
 const [isAdModalOpen, setIsAdModalOpen] = useState(false);
 const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-const [activeAds, setActiveAds] = useState<ActiveBanner[]>([]);
-const [stickyAds, setStickyAds] = useState<ActiveBanner[]>([]);
-const [shaktiClicks, setShaktiClicks] = useState(0);
+
 const [globalClickCount, setGlobalClickCount] = useState(0);
 
-const [detectedLocation, setDetectedLocation] = useState({ state: 'Rajasthan', district: 'Jaipur', tehsil: 'Sanganer' });
 const shaktiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 
-// ✅ GOOGLE LOGIN
+// ✅ GOOGLE LOGIN (Mobile Fix)
 const handleGoogleLogin = async () => {
   try {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    await signInWithRedirect(auth, provider);
   } catch (error) {
-    console.error("Google Login Error:", error);
+    console.error("Login Error:", error);
   }
 };
 
 const handleLogout = async () => {
-  try {
-    await signOut(auth);
-  } catch (error) {
-    console.error("Logout Error:", error);
-  }
+  await signOut(auth);
 };
 
 
-// क्लिक handler
+// 🔥 CLICK TRACK
 const handleGlobalClick = () => {
   setGlobalClickCount(prev => {
     const next = prev + 1;
-    if (next === 2 || next === 4 || next === 6) {
-      setIsAdModalOpen(true);
-    }
+    if ([2,4,6].includes(next)) setIsAdModalOpen(true);
     return next;
   });
 };
 
 
+// 🔥 FETCH WORKERS
 const fetchWorkers = async () => {
   setIsLoading(true);
-  const q = query(collection(db, 'workers'));
-  const snap = await getDocs(q);
+  const snap = await getDocs(collection(db, 'workers'));
   const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as WorkerProfile[];
   setWorkers(data);
   setIsLoading(false);
 };
 
 
-useEffect(() => {
+// 🔥 FETCH CATEGORIES
+const fetchCategories = async () => {
+  const snap = await getDocs(collection(db, 'categories'));
+  const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  setCategories(data);
+};
 
-  const unsubAuth = onAuthStateChanged(auth, (u) => {
-    setUser(u);
-  });
+
+// 🔥 FETCH WORKS (Subcategory)
+const fetchWorks = async () => {
+  const snap = await getDocs(collection(db, 'works'));
+  const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  setWorks(data);
+};
+
+
+useEffect(() => {
+  const unsub = onAuthStateChanged(auth, (u) => setUser(u));
 
   fetchWorkers();
+  fetchCategories();
+  fetchWorks();
 
-  return () => unsubAuth();
-
+  return () => unsub();
 }, []);
 
 
-// SEARCH
+// 🔍 SEARCH
 const handleSearch = () => {
   navigator.geolocation.getCurrentPosition((pos) => {
     const { latitude, longitude } = pos.coords;
@@ -110,7 +120,7 @@ return (
 <div className="min-h-screen bg-slate-50" onClick={handleGlobalClick}>
 
 {/* HEADER */}
-<header className="bg-emerald-700 text-white p-4 flex justify-between items-center">
+<header className="bg-emerald-700 text-white p-4 flex justify-between">
 
   <h1 className="text-xl font-bold flex items-center">
     <Tractor className="mr-2" />
@@ -126,19 +136,12 @@ return (
       Register
     </button>
 
-    {/* ✅ GOOGLE BUTTON */}
     {user ? (
-      <button
-        onClick={(e) => { e.stopPropagation(); handleLogout(); }}
-        className="bg-red-500 px-4 py-2 rounded"
-      >
+      <button onClick={handleLogout} className="bg-red-500 px-4 py-2 rounded">
         Logout
       </button>
     ) : (
-      <button
-        onClick={(e) => { e.stopPropagation(); handleGoogleLogin(); }}
-        className="bg-white text-emerald-700 px-4 py-2 rounded"
-      >
+      <button onClick={handleGoogleLogin} className="bg-white text-emerald-700 px-4 py-2 rounded">
         Login Google
       </button>
     )}
@@ -152,27 +155,37 @@ return (
 
 {activeTab === 'search' && (
   <>
-    <SearchForm filters={filters} setFilters={setFilters} onSearch={handleSearch} isLoading={isLoading} />
+    <SearchForm 
+      filters={filters}
+      setFilters={setFilters}
+      onSearch={handleSearch}
+      isLoading={isLoading}
+      categories={categories}
+      works={works}
+    />
     <Map center={mapCenter} workers={filteredWorkers} userLocation={userLocation} />
   </>
 )}
 
-{activeTab === 'register' && <WorkerRegistration />}
+{activeTab === 'register' && (
+  <WorkerRegistration 
+    categories={categories}
+    works={works}
+  />
+)}
 
-{activeTab === 'privacy' && <PrivacyPolicy onBack={() => setActiveTab('search')} />}
+{activeTab === 'privacy' && (
+  <PrivacyPolicy onBack={() => setActiveTab('search')} />
+)}
 
 </main>
 
-{/* ✅ FOOTER & MODALS (यहाँ वह 14+ लाइन वाला हिस्सा है जो फिक्स किया गया है) */}
-<footer className="bg-emerald-700 text-white p-4 text-center mt-auto">
-  <div className="flex flex-col items-center gap-2">
-    <p>© 2026 Gram Shakti - Empowering Rural Workforce</p>
-    <div className="flex gap-4 text-sm opacity-80">
-      <span>Location: {detectedLocation.district}, {detectedLocation.state}</span>
-      <button onClick={() => setActiveTab('privacy')} className="underline">Privacy Policy</button>
-    </div>
-  </div>
+
+{/* FOOTER */}
+<footer className="bg-emerald-700 text-white p-4 text-center">
+  <p>© 2026 Gram Shakti</p>
 </footer>
+
 
 <AdminPanel isOpen={isAdminPanelOpen} onClose={() => setIsAdminPanelOpen(false)} />
 <AdDashboard isOpen={isAdModalOpen} onClose={() => setIsAdModalOpen(false)} />
