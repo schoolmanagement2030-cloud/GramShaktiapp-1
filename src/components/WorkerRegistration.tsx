@@ -4,6 +4,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { Category } from '../types';
 import { CATEGORIES, MAIN_CATEGORIES } from '../constants';
 import { MapPin, Phone, User, Home, CheckCircle, LogIn, ChevronDown, Wrench, Tractor, Truck, Store, PartyPopper, Monitor, HeartPulse, GraduationCap, HardHat, PawPrint, Droplets, Key, Coffee, Briefcase } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 const iconMap: Record<string, any> = {
   Wrench, Tractor, Truck, Store, PartyPopper, Monitor, User, HeartPulse, GraduationCap, HardHat, PawPrint, Droplets, Key, Coffee, Briefcase
@@ -14,9 +15,7 @@ export default function WorkerRegistration() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isSkillsOpen, setIsSkillsOpen] = useState(false); 
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const skillsRef = useRef<HTMLDivElement>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -24,22 +23,27 @@ export default function WorkerRegistration() {
     pincode: '',
     village: '',
     category: `${MAIN_CATEGORIES[0].hindi} (${MAIN_CATEGORIES[0].english})` as Category,
+    subCategory: '',
     skills: '',
     location: null as { lat: number; lng: number } | null,
   });
+
+  const [isSubDropdownOpen, setIsSubDropdownOpen] = useState(false);
+  const subDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((u) => setUser(u));
     return () => unsubscribe();
   }, []);
 
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
-      if (skillsRef.current && !skillsRef.current.contains(event.target as Node)) {
-        setIsSkillsOpen(false);
+      if (subDropdownRef.current && !subDropdownRef.current.contains(event.target as Node)) {
+        setIsSubDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -104,14 +108,16 @@ export default function WorkerRegistration() {
     }
   };
 
-  // ✅ Category match logic fix
   const selectedMainCat = MAIN_CATEGORIES.find(
-    cat => formData.category === `${cat.hindi} (${cat.english})`
+    cat => formData.category.includes(cat.hindi) || formData.category.includes(cat.english)
   );
 
-  const filteredSkills = selectedMainCat 
-    ? CATEGORIES.filter(skill => skill.mainCategoryId === selectedMainCat.id)
-    : [];
+  useEffect(() => {
+    if (selectedMainCat && selectedMainCat.subCategories.length > 0) {
+      const firstSub = selectedMainCat.subCategories[0];
+      setFormData(prev => ({ ...prev, subCategory: `${firstSub.hindi} (${firstSub.english})` }));
+    }
+  }, [formData.category]);
 
   const SelectedIcon = selectedMainCat ? (iconMap[selectedMainCat.icon] || Wrench) : Wrench;
 
@@ -139,213 +145,226 @@ export default function WorkerRegistration() {
     );
   }
 
-  if (isSuccess) {
-    return (
-      <div className="bg-white p-8 rounded-2xl shadow-md border border-slate-100 text-center">
-        <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle className="text-emerald-600" size={48} />
-        </div>
-        <h2 className="text-3xl font-bold text-slate-900 mb-2">Registration Successful! / पंजीकरण सफल रहा!</h2>
-        <p className="text-slate-600 mb-8">Your profile is now live and visible to nearby customers. / आपकी प्रोफ़ाइल अब लाइव है और आस-पास के ग्राहकों को दिखाई दे रही है।</p>
-        <button
-          onClick={() => setIsSuccess(false)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl transition-all"
-        >
-          Register Another / एक और पंजीकरण करें
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-white p-8 rounded-2xl shadow-md border border-slate-100">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b pb-4">Create Your Profile / अपनी प्रोफ़ाइल बनाएं</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <User size={16} /> Name / Shop Name (नाम / दुकान का नाम)
-            </label>
-            <input
-              required
-              type="text"
-              placeholder="Enter your name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <Phone size={16} /> Mobile Number (मोबाइल नंबर)
-            </label>
-            <input
-              required
-              type="tel"
-              pattern="[0-9]{10}"
-              placeholder="10-digit number"
-              value={formData.mobile}
-              onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <Home size={16} /> Pincode (पिनकोड)
-            </label>
-            <input
-              required
-              type="text"
-              placeholder="6-digit pincode"
-              value={formData.pincode}
-              onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <MapPin size={16} /> Village / Locality (गाँव / इलाका)
-            </label>
-            <input
-              required
-              type="text"
-              placeholder="Enter village name"
-              value={formData.village}
-              onChange={(e) => setFormData({ ...formData, village: e.target.value })}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-          </div>
-          
-          <div className="space-y-2 relative" ref={dropdownRef}>
-            <label className="block text-sm font-semibold text-slate-700">Category / श्रेणी</label>
+      <AnimatePresence mode="wait">
+        {isSuccess ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-8"
+          >
+            <div className="bg-emerald-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="text-emerald-600" size={48} />
+            </div>
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">Registration Successful! / पंजीकरण सफल रहा!</h2>
+            <p className="text-slate-600 mb-8">Your profile is now live and visible to nearby customers. / आपकी प्रोफ़ाइल अब लाइव है और आस-पास के ग्राहकों को दिखाई दे रही है।</p>
             <button
-              type="button"
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none flex items-center justify-between gap-3 text-left"
+              onClick={() => setIsSuccess(false)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded-xl transition-all"
             >
-              <div className="flex items-center gap-3">
-                <div className={`p-1.5 rounded-lg ${selectedMainCat ? selectedMainCat.color + ' bg-opacity-10 text-' + selectedMainCat.color.split('-')[1] + '-600' : 'bg-slate-200 text-slate-500'}`}>
-                  <SelectedIcon size={18} />
-                </div>
-                <span className="text-sm font-bold text-slate-700">
-                  {formData.category || 'Select Category'}
-                </span>
-              </div>
-              <ChevronDown size={18} className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              Register Another / एक और पंजीकरण करें
             </button>
-
-            {isDropdownOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 max-h-[300px] overflow-y-auto py-2">
-                {MAIN_CATEGORIES.map((cat) => {
-                  const Icon = iconMap[cat.icon] || Wrench;
-                  return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setFormData({ 
-                          ...formData, 
-                          category: `${cat.hindi} (${cat.english})` as Category,
-                          skills: '' 
-                        });
-                        setIsDropdownOpen(false);
-                      }}
-                      className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-emerald-50 transition-colors text-left group"
-                    >
-                      <div className={`p-1.5 rounded-lg ${cat.color} bg-opacity-10 text-${cat.color.split('-')[1]}-600 group-hover:bg-opacity-20`}>
-                        <Icon size={16} />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-700">{cat.hindi}</span>
-                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{cat.english}</span>
-                      </div>
-                    </button>
-                  );
-                })}
+          </motion.div>
+        ) : (
+          <motion.form
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            onSubmit={handleSubmit}
+            className="space-y-6"
+          >
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b pb-4">Create Your Profile / अपनी प्रोफ़ाइल बनाएं</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <User size={16} /> Name / Shop Name (नाम / दुकान का नाम)
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="Enter your name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
               </div>
-            )}
-          </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <Phone size={16} /> Mobile Number (मोबाइल नंबर)
+                </label>
+                <input
+                  required
+                  type="tel"
+                  pattern="[0-9]{10}"
+                  placeholder="10-digit number"
+                  value={formData.mobile}
+                  onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <Home size={16} /> Pincode (पिनकोड)
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="6-digit pincode"
+                  value={formData.pincode}
+                  onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <MapPin size={16} /> Village / Locality (गाँव / इलाका)
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="Enter village name"
+                  value={formData.village}
+                  onChange={(e) => setFormData({ ...formData, village: e.target.value })}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+              
+              {/* Custom Category Dropdown */}
+              <div className="space-y-2 relative" ref={dropdownRef}>
+                <label className="block text-sm font-semibold text-slate-700">Main Category / मुख्य श्रेणी</label>
+                <button
+                  type="button"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none flex items-center justify-between gap-3 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`p-1.5 rounded-lg ${selectedMainCat ? selectedMainCat.color + ' bg-opacity-10 text-' + selectedMainCat.color.split('-')[1] + '-600' : 'bg-slate-200 text-slate-500'}`}>
+                      <SelectedIcon size={18} />
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">
+                      {selectedMainCat ? `${selectedMainCat.hindi} (${selectedMainCat.english})` : 'Select Category'}
+                    </span>
+                  </div>
+                  <ChevronDown size={18} className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
 
-          <div className="space-y-2 relative" ref={skillsRef}>
-            <label className="block text-sm font-semibold text-slate-700">Skills / Services (हुनर / सेवाएं)</label>
-            <button
-              type="button"
-              onClick={() => setIsSkillsOpen(!isSkillsOpen)}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none flex items-center justify-between gap-3 text-left"
-            >
-              <span className={`text-sm ${formData.skills ? 'font-bold text-slate-700' : 'text-slate-400'}`}>
-                {formData.skills || 'Select Skill / हुनर चुनें'}
-              </span>
-              <ChevronDown size={18} className={`text-slate-400 transition-transform ${isSkillsOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isSkillsOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 max-h-[300px] overflow-y-auto py-2">
-                {filteredSkills.length > 0 ? (
-                  filteredSkills.map((skill) => (
-                    <button
-                      key={skill.id}
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, skills: `${skill.hindi} (${skill.english})` });
-                        setIsSkillsOpen(false);
-                      }}
-                      className="w-full px-4 py-2.5 hover:bg-emerald-50 transition-colors text-left"
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-700">{skill.hindi}</span>
-                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{skill.english}</span>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-4 py-2 text-sm text-slate-500 italic">Please select a category first / पहले श्रेणी चुनें</div>
+                {isDropdownOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 max-h-[300px] overflow-y-auto py-2">
+                    {MAIN_CATEGORIES.map((cat) => {
+                      const Icon = iconMap[cat.icon] || Wrench;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, category: `${cat.hindi} (${cat.english})` as Category });
+                            setIsDropdownOpen(false);
+                          }}
+                          className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-emerald-50 transition-colors text-left group"
+                        >
+                          <div className={`p-1.5 rounded-lg ${cat.color} bg-opacity-10 text-${cat.color.split('-')[1]}-600 group-hover:bg-opacity-20`}>
+                            <Icon size={16} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-slate-700">{cat.hindi}</span>
+                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tight">{cat.english}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-        </div>
 
-        <div className="bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-300">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="text-center md:text-left">
-              <h3 className="font-bold text-slate-900">GPS Location / GPS स्थान</h3>
-              <p className="text-sm text-slate-500">We need your exact location to show you to nearby customers. / हमें आस-पास के ग्राहकों को दिखाने के लिए आपके सटीक स्थान की आवश्यकता है।</p>
+              {/* Sub-Category Dropdown */}
+              <div className="space-y-2 relative" ref={subDropdownRef}>
+                <label className="block text-sm font-semibold text-slate-700">Sub-Category / उप-श्रेणी</label>
+                <button
+                  type="button"
+                  onClick={() => setIsSubDropdownOpen(!isSubDropdownOpen)}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none flex items-center justify-between gap-3 text-left"
+                >
+                  <span className="text-sm font-bold text-slate-700">
+                    {formData.subCategory || 'Select Sub-Category'}
+                  </span>
+                  <ChevronDown size={18} className={`text-slate-400 transition-transform ${isSubDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isSubDropdownOpen && selectedMainCat && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 max-h-[300px] overflow-y-auto py-2">
+                    {selectedMainCat.subCategories.map((sub, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setFormData({ ...formData, subCategory: `${sub.hindi} (${sub.english})` });
+                          setIsSubDropdownOpen(false);
+                        }}
+                        className="w-full px-4 py-2.5 hover:bg-emerald-50 transition-colors text-left"
+                      >
+                        <span className="text-sm font-bold text-slate-700">{sub.hindi}</span>
+                        <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tight ml-2">({sub.english})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-slate-700">Skills / Services (हुनर / सेवाएं)</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Electrician, Grocery, Plumber"
+                  value={formData.skills}
+                  onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none"
+                />
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={captureLocation}
-              disabled={isLoading}
-              className={`flex items-center gap-2 py-3 px-6 rounded-xl font-bold transition-all ${
-                formData.location 
-                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
-                  : 'bg-slate-900 text-white hover:bg-slate-800'
-              }`}
-            >
-              <MapPin size={18} />
-              {formData.location ? 'Location Captured / स्थान कैप्चर किया गया' : 'Capture GPS / GPS कैप्चर करें'}
-            </button>
-          </div>
-          {formData.location && (
-            <p className="text-xs text-emerald-600 mt-2 font-medium">
-              ✓ Lat: {formData.location.lat.toFixed(4)}, Lng: {formData.location.lng.toFixed(4)}
-            </p>
-          )}
-        </div>
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-200"
-        >
-          {isLoading ? (
-            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            'Submit Registration / पंजीकरण जमा करें'
-          )}
-        </button>
-      </form>
+            <div className="bg-slate-50 p-6 rounded-2xl border border-dashed border-slate-300">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="text-center md:text-left">
+                  <h3 className="font-bold text-slate-900">GPS Location / GPS स्थान</h3>
+                  <p className="text-sm text-slate-500">We need your exact location to show you to nearby customers. / हमें आस-पास के ग्राहकों को दिखाने के लिए आपके सटीक स्थान की आवश्यकता है।</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={captureLocation}
+                  disabled={isLoading}
+                  className={`flex items-center gap-2 py-3 px-6 rounded-xl font-bold transition-all ${
+                    formData.location 
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
+                      : 'bg-slate-900 text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <MapPin size={18} />
+                  {formData.location ? 'Location Captured / स्थान कैप्चर किया गया' : 'Capture GPS / GPS कैप्चर करें'}
+                </button>
+              </div>
+              {formData.location && (
+                <p className="text-xs text-emerald-600 mt-2 font-medium">
+                  ✓ Lat: {formData.location.lat.toFixed(4)}, Lng: {formData.location.lng.toFixed(4)}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] shadow-lg shadow-emerald-200"
+            >
+              {isLoading ? (
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Submit Registration / पंजीकरण जमा करें'
+              )}
+            </button>
+          </motion.form>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
