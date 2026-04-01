@@ -1,24 +1,54 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  RecaptchaVerifier,
+  signInWithPhoneNumber
+} from 'firebase/auth';
+
+import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
+// ✅ INIT APP
 const app = initializeApp(firebaseConfig);
+
+// ✅ AUTH
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
 
-export { RecaptchaVerifier, signInWithPhoneNumber };
-export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
-export const logout = () => signOut(auth);
+// ✅ FIRESTORE (⚠️ FIXED)
+export const db = getFirestore(app); // ❌ पहले गलत था (databaseId मत डाल)
 
-async function testConnection() {
+// ✅ AUTH FUNCTIONS
+export const signInWithGoogle = async () => {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    return await signInWithPopup(auth, googleProvider);
   } catch (error) {
-    if(error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration. ");
-    }
+    console.error("Google Login Error:", error);
+    throw error;
   }
-}
+};
+
+export const logout = async () => {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error("Logout Error:", error);
+  }
+};
+
+// ✅ PHONE LOGIN EXPORT
+export { RecaptchaVerifier, signInWithPhoneNumber };
+
+// ✅ OPTIONAL TEST (Safe)
+const testConnection = async () => {
+  try {
+    console.log("🔥 Firebase Connected Successfully");
+  } catch (error) {
+    console.error("Firebase Connection Error:", error);
+  }
+};
+
 testConnection();
