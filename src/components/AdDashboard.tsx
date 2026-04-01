@@ -12,6 +12,9 @@ import {
 
 import { motion } from 'framer-motion';
 
+// ✅ NEW: ADS SYSTEM IMPORT
+import { showAd } from '../constants';
+
 // ✅ TYPES
 type AdType = 'Local' | 'Corporate';
 type TargetLevel = 'India' | 'State' | 'District' | 'Tehsil';
@@ -66,6 +69,9 @@ export default function AdDashboard({ isOpen, onClose }: Props) {
   const [myAds, setMyAds] = useState<ActiveBanner[]>([]);
   const [adStats, setAdStats] = useState<Record<string, AdStats>>({});
   const [step, setStep] = useState(1);
+
+  // ✅ NEW: AD CLICK STATE
+  const [adClickCount, setAdClickCount] = useState(0);
 
   const [formData, setFormData] = useState({
     text: '',
@@ -190,6 +196,24 @@ export default function AdDashboard({ isOpen, onClose }: Props) {
     setStep(4);
   };
 
+  // ✅ NEW: AD BUTTON CLICK
+  const handleAdClick = () => {
+    setAdClickCount((prev) => {
+      const newCount = prev + 1;
+
+      if (newCount % 2 === 1) {
+        alert("📢 Local Ad दिख रहा है");
+      } else {
+        alert("🌍 Google Ad दिख रहा है");
+      }
+
+      // external function भी call (future use)
+      showAd();
+
+      return newCount;
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -212,6 +236,11 @@ export default function AdDashboard({ isOpen, onClose }: Props) {
 
           <button onClick={handleLogout}>
             Logout
+          </button>
+
+          {/* ✅ NEW: ADS BUTTON */}
+          <button onClick={handleAdClick}>
+            🎯 Show Ad
           </button>
 
           {myAds.map((ad) => (
