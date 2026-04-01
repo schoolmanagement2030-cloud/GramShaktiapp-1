@@ -98,7 +98,6 @@ export const CATEGORY_MAP: any = {
     "इलेक्ट्रॉनिक्स रिपेयर","मशीन रिपेयर"
   ],
 
-  // 🔥 HIGH EARNING DIGITAL
   ai_services: [
     "AI कंटेंट","ChatGPT काम",
     "वीडियो ऑटोमेशन","फ्रीलांसिंग",
@@ -145,7 +144,6 @@ export const MAIN_CATEGORIES = [
   { hindi: "फूड सर्विस", english: "food_hospitality", icon: "Coffee", color: "bg-orange-600" },
   { hindi: "लीगल और फाइनेंस", english: "legal_finance", icon: "Briefcase", color: "bg-blue-700" },
 
-  // 🔥 HIGH EARNING
   { hindi: "AI सर्विस", english: "ai_services", icon: "Monitor", color: "bg-black" },
   { hindi: "E-Commerce", english: "ecommerce", icon: "Store", color: "bg-green-800" },
   { hindi: "कंटेंट क्रिएटर", english: "content_creator", icon: "PartyPopper", color: "bg-pink-700" },
@@ -155,3 +153,24 @@ export const MAIN_CATEGORIES = [
 
   { hindi: "अन्य सर्विस", english: "other_services", icon: "User", color: "bg-slate-600" }
 ];
+
+
+// 🔥🔥 ADS SYSTEM (NEW ADDITION)
+
+// Click counter
+let adClickCount = 0;
+
+// Ad दिखाने का function
+export const showAd = () => {
+  adClickCount++;
+
+  if (adClickCount % 2 === 1) {
+    // 👉 Local Ad
+    console.log("Showing Local Ad");
+    alert("📢 Local Ad: आपका local promotion यहाँ दिखेगा");
+  } else {
+    // 👉 Google Ad
+    console.log("Showing Google Ad");
+    alert("🌍 Google Ad: Google AdSense Ad दिखेगा");
+  }
+};
