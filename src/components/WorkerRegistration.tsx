@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { auth, db, signInWithGoogle } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { MAIN_CATEGORIES, CATEGORIES } from '../constants';
+import { MAIN_CATEGORIES, CATEGORY_MAP } from '../constants'; // ✅ FIXED
 import { CheckCircle, LogIn, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -22,9 +22,7 @@ export default function WorkerRegistration() {
     mobile: '',
     pincode: '',
     village: '',
-    category: MAIN_CATEGORIES[0]
-      ? `${MAIN_CATEGORIES[0].hindi} (${MAIN_CATEGORIES[0].english})`
-      : '',
+    category: '',
     subCategory: '',
     location: null as { lat: number; lng: number } | null,
   });
@@ -48,6 +46,11 @@ export default function WorkerRegistration() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // ✅ Selected category object
+  const selectedCategoryObj: any = MAIN_CATEGORIES.find(
+    (cat: any) => cat.english === formData.category
+  );
 
   // ✅ GPS
   const captureLocation = () => {
@@ -87,7 +90,7 @@ export default function WorkerRegistration() {
     }
   };
 
-  // 🔴 LOGIN SCREEN
+  // 🔴 LOGIN
   if (!user) {
     return (
       <div className="bg-white p-8 rounded-2xl shadow text-center">
@@ -119,7 +122,7 @@ export default function WorkerRegistration() {
 
           <h2 className="text-xl font-bold">Register Worker</h2>
 
-          {/* Inputs */}
+          {/* INPUTS */}
           <input className="w-full p-3 border rounded-xl"
             placeholder="Name"
             value={formData.name}
@@ -144,7 +147,7 @@ export default function WorkerRegistration() {
             onChange={e=>setFormData({...formData,village:e.target.value})}
           />
 
-          {/* MAIN CATEGORY */}
+          {/* 🔥 MAIN CATEGORY */}
           <div ref={dropdownRef}>
             <button type="button"
               onClick={()=>setIsDropdownOpen(!isDropdownOpen)}
@@ -156,13 +159,14 @@ export default function WorkerRegistration() {
 
             {isDropdownOpen && (
               <div className="border mt-2 rounded-xl bg-white shadow max-h-60 overflow-y-auto">
-                {MAIN_CATEGORIES.map(cat=>(
-                  <div key={cat.id}
+                {MAIN_CATEGORIES.map((cat: any)=>(
+                  <div key={cat.english}
                     className="p-3 hover:bg-gray-100 cursor-pointer"
                     onClick={()=>{
                       setFormData({
                         ...formData,
-                        category:`${cat.hindi} (${cat.english})`
+                        category: cat.english,
+                        subCategory: ''
                       });
                       setIsDropdownOpen(false);
                     }}
@@ -174,19 +178,19 @@ export default function WorkerRegistration() {
             )}
           </div>
 
-          {/* SUB CATEGORY */}
+          {/* 🔥 SUB CATEGORY (DYNAMIC) */}
           <div ref={subDropdownRef}>
             <button type="button"
               onClick={()=>setIsSubDropdownOpen(!isSubDropdownOpen)}
               className="w-full p-3 border rounded-xl flex justify-between"
             >
-              {formData.subCategory || "Select Sub"}
+              {formData.subCategory || "Select Work"}
               <ChevronDown />
             </button>
 
-            {isSubDropdownOpen && (
+            {isSubDropdownOpen && selectedCategoryObj && (
               <div className="border mt-2 rounded-xl bg-white shadow max-h-60 overflow-y-auto">
-                {CATEGORIES.map((sub,i)=>(
+                {CATEGORY_MAP[selectedCategoryObj.english]?.map((sub: string,i:number)=>(
                   <div key={i}
                     className="p-3 hover:bg-gray-100 cursor-pointer"
                     onClick={()=>{
