@@ -1,23 +1,14 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { auth, db, signInWithGoogle } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { MAIN_CATEGORIES } from '../constants';
-import { 
-  CheckCircle, LogIn, ChevronDown, Wrench 
-} from 'lucide-react';
+import { MAIN_CATEGORIES, CATEGORIES } from '../constants';
+import { CheckCircle, LogIn, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-
-const iconMap: Record<string, any> = {
-  Wrench
-};
 
 export default function WorkerRegistration() {
 
-  const safeMainCategories = MAIN_CATEGORIES || [];
-
   const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -31,20 +22,20 @@ export default function WorkerRegistration() {
     mobile: '',
     pincode: '',
     village: '',
-    category: safeMainCategories.length > 0
-      ? `${safeMainCategories[0].hindi} (${safeMainCategories[0].english})`
+    category: MAIN_CATEGORIES[0]
+      ? `${MAIN_CATEGORIES[0].hindi} (${MAIN_CATEGORIES[0].english})`
       : '',
     subCategory: '',
     location: null as { lat: number; lng: number } | null,
   });
 
-  // ✅ Auth Fix
+  // ✅ Auth
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsubscribe();
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsub();
   }, []);
 
-  // ✅ Close dropdown safely
+  // ✅ Close dropdown
   useEffect(() => {
     function handleClickOutside(e: any) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -58,25 +49,8 @@ export default function WorkerRegistration() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ✅ Safe selected category
-  const selectedMainCat = useMemo(() => {
-    return safeMainCategories.find(
-      c => `${c.hindi} (${c.english})` === formData.category
-    );
-  }, [formData.category, safeMainCategories]);
-
-  // ✅ Sub category safe fix
-  useEffect(() => {
-    if (selectedMainCat && selectedMainCat.subCategories?.length > 0) {
-      setFormData(prev => ({
-        ...prev,
-        subCategory: `${selectedMainCat.subCategories[0].hindi} (${selectedMainCat.subCategories[0].english})`
-      }));
-    }
-  }, [selectedMainCat]);
-
+  // ✅ GPS
   const captureLocation = () => {
-    setIsLoading(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setFormData(prev => ({
@@ -86,15 +60,12 @@ export default function WorkerRegistration() {
             lng: pos.coords.longitude
           }
         }));
-        setIsLoading(false);
       },
-      () => {
-        alert("GPS ON karo");
-        setIsLoading(false);
-      }
+      () => alert("GPS ON karo")
     );
   };
 
+  // ✅ Submit
   const handleSubmit = async (e: any) => {
     e.preventDefault();
 
@@ -103,22 +74,20 @@ export default function WorkerRegistration() {
       return;
     }
 
-    setIsLoading(true);
     try {
       await addDoc(collection(db, 'workers'), {
         ...formData,
-        uid: user?.uid || "guest", // ✅ FIX
+        uid: user?.uid || "guest",
         createdAt: new Date()
       });
       setIsSuccess(true);
     } catch (err) {
-      console.error(err);
       alert("Error aaya");
+      console.error(err);
     }
-    setIsLoading(false);
   };
 
-  // 🔴 LOGIN
+  // 🔴 LOGIN SCREEN
   if (!user) {
     return (
       <div className="bg-white p-8 rounded-2xl shadow text-center">
@@ -134,22 +103,23 @@ export default function WorkerRegistration() {
   }
 
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-lg border">
+    <div className="bg-white p-6 rounded-2xl shadow-lg border max-w-md mx-auto">
       <AnimatePresence mode="wait">
 
         {isSuccess ? (
           <motion.div key="success" initial={{opacity:0}} animate={{opacity:1}}>
             <CheckCircle className="text-green-600 mx-auto" size={60} />
-            <h2 className="text-center text-2xl mt-4 font-bold">
+            <h2 className="text-center text-xl mt-4 font-bold">
               Registration Successful
             </h2>
           </motion.div>
         ) : (
 
-        <motion.form onSubmit={handleSubmit} className="space-y-6">
+        <motion.form onSubmit={handleSubmit} className="space-y-4">
 
-          <h2 className="text-2xl font-bold">Register Worker</h2>
+          <h2 className="text-xl font-bold">Register Worker</h2>
 
+          {/* Inputs */}
           <input className="w-full p-3 border rounded-xl"
             placeholder="Name"
             value={formData.name}
@@ -185,8 +155,8 @@ export default function WorkerRegistration() {
             </button>
 
             {isDropdownOpen && (
-              <div className="border mt-2 rounded-xl bg-white shadow">
-                {safeMainCategories.map(cat=>(
+              <div className="border mt-2 rounded-xl bg-white shadow max-h-60 overflow-y-auto">
+                {MAIN_CATEGORIES.map(cat=>(
                   <div key={cat.id}
                     className="p-3 hover:bg-gray-100 cursor-pointer"
                     onClick={()=>{
@@ -214,20 +184,20 @@ export default function WorkerRegistration() {
               <ChevronDown />
             </button>
 
-            {isSubDropdownOpen && selectedMainCat?.subCategories && (
-              <div className="border mt-2 rounded-xl bg-white shadow">
-                {selectedMainCat.subCategories.map((sub:any,i:number)=>(
+            {isSubDropdownOpen && (
+              <div className="border mt-2 rounded-xl bg-white shadow max-h-60 overflow-y-auto">
+                {CATEGORIES.map((sub,i)=>(
                   <div key={i}
                     className="p-3 hover:bg-gray-100 cursor-pointer"
                     onClick={()=>{
                       setFormData({
                         ...formData,
-                        subCategory:`${sub.hindi} (${sub.english})`
+                        subCategory: sub
                       });
                       setIsSubDropdownOpen(false);
                     }}
                   >
-                    {sub.hindi}
+                    {sub}
                   </div>
                 ))}
               </div>
