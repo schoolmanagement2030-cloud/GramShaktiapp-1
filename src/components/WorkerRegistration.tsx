@@ -74,9 +74,9 @@ export default function WorkerRegistration() {
     }
   };
 
-  const selectedCategoryObj = MAIN_CATEGORIES.find(
-    (cat: any) => cat.english === formData.category
-  );
+  // ✅ FIXED (SAFE)
+  const selectedCategoryObj =
+    MAIN_CATEGORIES?.find((cat: any) => cat.english === formData.category) || null;
 
   const captureLocation = () => {
     navigator.geolocation.getCurrentPosition(
@@ -233,7 +233,7 @@ export default function WorkerRegistration() {
 
               {isSubDropdownOpen && selectedCategoryObj && (
                 <div className="border mt-2 rounded-xl bg-white max-h-60 overflow-y-auto">
-                  {CATEGORY_MAP[selectedCategoryObj.english]?.map((sub: string, i: number) => (
+                  {CATEGORY_MAP[selectedCategoryObj?.english || ""]?.map((sub: string, i: number) => (
                     <div key={i}
                       className="p-3 hover:bg-gray-100 cursor-pointer"
                       onClick={() => {
