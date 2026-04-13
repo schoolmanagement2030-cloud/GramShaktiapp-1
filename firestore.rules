@@ -20,14 +20,13 @@ service cloud.firestore {
 
     function isValidWorker(data) {
       return data.keys().hasAll([
-        'uid', 'name', 'mobile', 'category', 'skills',
+        'uid', 'name', 'mobile', 'category',
         'location', 'pincode', 'village', 'createdAt'
       ]) &&
       data.uid is string &&
       data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
       data.mobile is string && data.mobile.matches('^[0-9]{10}$') &&
       data.category is string && data.category.size() > 0 &&
-      data.skills is string && data.skills.size() < 200 &&
       data.pincode is string && data.pincode.size() == 6 &&
       data.village is string &&
       data.location is map &&
