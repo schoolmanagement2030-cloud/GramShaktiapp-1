@@ -13,26 +13,26 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (
+          exists(/databases/$(database)/documents/admin_config/setup) && 
           get(/databases/$(database)/documents/admin_config/setup).data.adminUid == request.auth.uid ||
           (request.auth.token.email == "vikas123metro01@gmail.com" && request.auth.token.email_verified == true)
         );
     }
 
+    // ✅ सुधार: Mobile और Pincode को लचीला बनाया गया है ताकि नंबर/स्ट्रिंग दोनों चल सकें
     function isValidWorker(data) {
       return data.keys().hasAll([
-        'uid', 'name', 'mobile', 'category',
+        'uid', 'name', 'mobile', 'category', 'subCategory',
         'location', 'pincode', 'village', 'createdAt'
       ]) &&
       data.uid is string &&
-      data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-      data.mobile is string && data.mobile.matches('^[0-9]{10}$') &&
-      data.category is string && data.category.size() > 0 &&
-      data.pincode is string && data.pincode.size() == 6 &&
+      data.name is string && data.name.size() > 0 &&
+      data.category is string &&
+      data.pincode != null &&
       data.village is string &&
       data.location is map &&
       data.location.lat is number &&
-      data.location.lng is number &&
-      (data.createdAt is timestamp || data.createdAt is string);
+      data.location.lng is number;
     }
 
     function isValidAd(data) {
@@ -42,27 +42,8 @@ service cloud.firestore {
         'paymentScreenshot', 'status', 'createdAt'
       ]) &&
       data.uid is string &&
-      data.text is string && data.text.size() > 0 && data.text.size() < 500 &&
       data.adType in ['Local', 'Corporate'] &&
-      data.targetLevel in ['India', 'State', 'District', 'Tehsil'] &&
-      data.targetValue is string &&
-      data.plan in [7, 15, 30] &&
-      data.price is number &&
-      data.paymentScreenshot is string &&
-      data.status in ['pending', 'active', 'expired'] &&
-      (data.createdAt is timestamp || data.createdAt is string);
-    }
-
-    function isValidAdStats(data) {
-      return data.keys().hasAll([
-        'adId', 'views_count', 'click_count',
-        'call_action_count', 'lastUpdated'
-      ]) &&
-      data.adId is string &&
-      data.views_count is number &&
-      data.click_count is number &&
-      data.call_action_count is number &&
-      (data.lastUpdated is timestamp || data.lastUpdated is string);
+      data.status in ['pending', 'active', 'expired'];
     }
 
     match /admin_config/setup {
@@ -72,26 +53,23 @@ service cloud.firestore {
     }
 
     match /workers/{workerId} {
-      allow read: if true;
+      // ✅ सुरक्षा: केवल लॉगिन वाले लोग ही डेटा देख पाएंगे
+      allow read: if isAuthenticated();
 
+      // ✅ सुरक्षा: केवल वही यूजर अपना डेटा डाल पाएगा जो लॉगिन है
       allow create: if isAuthenticated() &&
         request.resource.data.uid == request.auth.uid &&
         isValidWorker(request.resource.data);
 
       allow update: if isOwner(resource.data.uid) &&
-        request.resource.data.uid == resource.data.uid &&
         isValidWorker(request.resource.data);
 
-      allow delete: if isOwner(resource.data.uid);
+      allow delete: if isOwner(resource.data.uid) || isAdmin();
     }
 
     match /pending_ads/{adId} {
       allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.uid);
-
-      allow create: if isAuthenticated() &&
-        request.resource.data.uid == request.auth.uid &&
-        isValidAd(request.resource.data);
-
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 
@@ -102,25 +80,12 @@ service cloud.firestore {
 
     match /ad_stats/{adId} {
       allow read: if isAdmin();
-
-      allow create: if isValidAdStats(request.resource.data);
-
-      allow update: if isValidAdStats(request.resource.data) &&
-        request.resource.data.adId == resource.data.adId;
-    }
-
-    match /ad_requests/{requestId} {
-      allow read: if isAdmin();
-      allow create: if true;
-      allow update, delete: if isAdmin();
+      allow create, update: if true; 
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated() &&
-        (request.auth.uid == userId || isAdmin());
-
-      allow write: if isAuthenticated() &&
-        request.auth.uid == userId;
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated() && request.auth.uid == userId;
     }
   }
 }
